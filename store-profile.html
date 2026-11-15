@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>โปรไฟล์ร้านค้า / สปอนเซอร์</title>
+    <!-- นำเข้า Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col justify-between">
+
+    <!-- ส่วนเนื้อหาหลัก -->
+    <main class="max-w-3xl w-full mx-auto bg-white shadow-sm min-h-screen pb-28">
+        <!-- แบนเนอร์ร้านค้า -->
+        <div class="relative w-full h-48 sm:h-64 bg-gray-200">
+            <img id="profile-banner" src="" alt="Store Banner" class="w-full h-full object-cover">
+            <!-- แก้ไขปุ่ม Back ให้กลับไปที่หน้ารายชื่อร้านค้า/สปอนเซอร์ทันที -->
+            <button onclick="goBackToSponsorList()"
+                class="absolute top-4 left-4 bg-black/50 text-white px-3 py-1.5 rounded-full text-sm backdrop-blur-sm hover:bg-black/70 transition">
+                ← กลับหน้าร้านค้า
+            </button>
+        </div>
+
+        <!-- ข้อมูลโปรไฟล์ร้าน -->
+        <div class="p-6 border-b border-gray-100">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <span id="profile-store-category"
+                        class="hidden inline-block text-xs font-medium bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full mb-1.5"></span>
+                    <h1 id="profile-store-name" class="text-2xl font-bold text-gray-900">กำลังโหลดชื่อร้าน...</h1>
+                </div>
+            </div>
+            <p id="profile-store-desc" class="text-gray-600 mt-2 text-sm leading-relaxed">กำลังโหลดรายละเอียดร้านค้า...
+            </p>
+        </div>
+
+        <!-- รายการแคมเปญของร้านนี้ -->
+        <div class="px-6 mt-5">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">🎁 แคมเปญและสิทธิพิเศษทั้งหมด</h2>
+                <span id="campaign-count-badge"
+                    class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium"></span>
+            </div>
+            <div id="store-campaigns-list" class="space-y-6">
+                <!-- รายการแคมเปญจะถูกเติมเข้ามาตรงนี้ด้วย JavaScript -->
+                <p class="text-gray-400 text-sm">กำลังโหลดแคมเปญ...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- ส่วนปุ่มดำเนินการด้านล่าง (Footer Action Buttons - เหลือเฉพาะปุ่มนำทางหลัก) -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg z-50">
+        <div class="max-w-3xl mx-auto flex gap-3">
+            <button id="btn-navigate" onclick="openGoogleMaps()"
+                class="w-full bg-blue-600 text-white py-3 rounded-xl font-medium shadow hover:bg-blue-700 transition flex items-center justify-center gap-1.5">
+                <span>📍</span> <span>นำทางไปที่ร้านค้าหลัก</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- Script สำหรับดึงข้อมูลแบบไดนามิก -->
+    <script>
+        const SUPABASE_URL = 'https://gnkfvgikmbbudvkblcnx.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_y7mJl9_LvLkKPOrInpoucg_BN7xR3UI';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentStoreData = null;
+        let currentCampaigns = [];
+
+        // ฟังก์ชันกำหนดเส้นทางกลับไปยังหน้ารายชื่อร้านค้า/สปอนเซอร์
+        function goBackToSponsorList() {
+            window.location.href = 'index.html?tab=sponsor';
+        }
+
+        // ฟังก์ชันช่วยจัดรูปแบบวันที่
+        function formatDateThai(dateStr) {
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('th-TH', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+
+        // ฟังก์ชันเปิด Google Maps นำทาง
+        function navigateToCoords(lat, lng) {
+            if (lat && lng) {
+                window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+            } else {
+                alert('ยังไม่มีข้อมูลพิกัดสำหรับตำแหน่งนี้');
+            }
+        }
+
+        async function claimCampaignReward(campaignId, pointsCost, campaignTitle) {
+            if (!confirm(`คุณต้องการใช้ ${pointsCost} พอยต์ เพื่อรับสิทธิ์แคมเปญ "${campaignTitle}" ใช่หรือไม่?`)) {
+                return;
+            }
+
+            let pointsDeducted = false;
+            let previousPoints = 0;
+            let claimInserted = false;
+
+            try {
+                const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+                if (sessionError) throw sessionError;
+
+                const user = session?.user;
+                if (!user) {
+                    alert('กรุณาเข้าสู่ระบบก่อนทำรายการ');
+                    return;
+                }
+
+                // 1. ดึงข้อมูลแคมเปญและพอยต์ปัจจุบัน
+                const { data: campaignData, error: campErr } = await supabaseClient
+                    .from('campaigns')
+                    .select('total_limit, claimed_count, points_cost, title, reward_details')
+                    .eq('id', campaignId)
+                    .single();
+                if (campErr) throw campErr;
+
+                const cost = campaignData.points_cost ?? pointsCost ?? 0;
+                const totalLimit = campaignData.total_limit ?? 10;
+                const claimedCount = campaignData.claimed_count ?? 0;
+
+                if (claimedCount >= totalLimit) {
+                    alert('สิทธิ์แคมเปญนี้เต็มแล้วครับ');
+                    return;
+                }
+
+                const { data: profileData, error: profErr } = await supabaseClient
+                    .from('profiles')
+                    .select('points')
+                    .eq('id', user.id)
+                    .single();
+                if (profErr) throw profErr;
+
+                const currentPoints = profileData?.points ?? 0;
+                previousPoints = currentPoints;
+
+                if (currentPoints < cost) {
+                    alert(`แต้มไม่พอครับ (ต้องการ ${cost} พอยต์ / มีอยู่ ${currentPoints} พอยต์)`);
+                    return;
+                }
+
+                // 2. หักพอยต์ใน profiles
+                const newPoints = currentPoints - cost;
+                const { error: updPointsErr } = await supabaseClient
+                    .from('profiles')
+                    .update({ points: newPoints })
+                    .eq('id', user.id);
+                if (updPointsErr) throw updPointsErr;
+                pointsDeducted = true;
+
+                // 3. บันทึกการรับสิทธิ์ใน campaign_claims
+                const { error: claimErr } = await supabaseClient
+                    .from('campaign_claims')
+                    .insert([{ campaign_id: campaignId, user_id: user.id }]);
+                if (claimErr) throw claimErr;
+                claimInserted = true;
+
+                // 4. สร้างรหัสและบันทึกลงตาราง user_coupons เพื่อให้ loadMyCoupons ดึงไปแสดงในกระเป๋า
+                const couponCode = 'STRIDE-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                const { error: couponErr } = await supabaseClient
+                    .from('user_coupons')
+                    .insert([{
+                        user_id: user.id,
+                        campaign_id: campaignId,
+                        coupon_code: couponCode,
+                        is_redeemed: false
+                    }]);
+                if (couponErr) throw couponErr;
+
+                // 5. อัปเดตจำนวนที่ถูกใช้ไปใน campaigns
+                const { error: updCampErr } = await supabaseClient
+                    .from('campaigns')
+                    .update({ claimed_count: claimedCount + 1 })
+                    .eq('id', campaignId);
+                if (updCampErr) throw updCampErr;
+
+                alert(`🎉 รับสิทธิ์แคมเปญ "${campaignTitle}" สำเร็จ! หัก ${cost} พอยต์ (คงเหลือ ${newPoints} พอยต์)`);
+                await loadStoreProfile();
+
+            } catch (err) {
+                // rollback ถ้าพลาดกลางทาง
+                if (claimInserted) {
+                    await supabaseClient.from('campaign_claims').delete().eq('user_id', (await supabaseClient.auth.getSession()).data.session?.user?.id).eq('campaign_id', campaignId);
+                }
+                if (pointsDeducted) {
+                    const uid = (await supabaseClient.auth.getSession()).data.session?.user?.id;
+                    if (uid) {
+                        await supabaseClient.from('profiles').update({ points: previousPoints }).eq('id', uid);
+                    }
+                }
+                console.error('Error claiming campaign:', err);
+                if (err?.code === '23505') {
+                    alert('คุณรับสิทธิ์แคมเปญนี้ไปแล้วครับ');
+                } else {
+                    alert('เกิดข้อผิดพลาดในการรับสิทธิ์: ' + (err.message || 'กรุณาลองใหม่อีกครั้ง'));
+                }
+            }
+        }
+
+        async function loadStoreProfile() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const storeId = urlParams.get('id');
+
+            if (!storeId) {
+                alert('ไม่พบรหัสร้านค้า');
+                return;
+            }
+
+            try {
+                // 1. ดึงข้อมูลโปรไฟล์ร้าน
+                const { data: store, error: storeError } = await supabaseClient
+                    .from('store_profiles')
+                    .select('*')
+                    .eq('id', storeId)
+                    .single();
+
+                if (storeError || !store) {
+                    console.error('Error fetching store:', storeError);
+                    document.getElementById('profile-store-name').innerText = 'ไม่พบข้อมูลร้านค้า';
+                    return;
+                }
+
+                currentStoreData = store;
+
+                if (store.banner_url) {
+                    document.getElementById('profile-banner').src = store.banner_url;
+                }
+                document.getElementById('profile-store-name').innerText = store.store_name || 'ร้านค้าไม่มีชื่อ';
+                document.getElementById('profile-store-desc').innerText = store.description || 'ยังไม่มีคำอธิบายร้านค้า';
+
+                if (store.category) {
+                    const catEl = document.getElementById('profile-store-category');
+                    catEl.innerText = store.category;
+                    catEl.classList.remove('hidden');
+                }
+
+                // 2. ดึงแคมเปญของร้านค้านี้
+                const { data: campaigns, error: campError } = await supabaseClient
+                    .from('campaigns')
+                    .select('*')
+                    .eq('sponsor_id', storeId);
+
+                const campContainer = document.getElementById('store-campaigns-list');
+                const countBadge = document.getElementById('campaign-count-badge');
+                campContainer.innerHTML = '';
+
+                if (campaigns && campaigns.length > 0) {
+                    currentCampaigns = campaigns;
+                    countBadge.innerText = `${campaigns.length} รายการ`;
+
+                    campaigns.forEach((camp) => {
+                        const campaignId = camp.id;
+                        const imageUrl = camp.image_url || camp.campaign_image || camp.banner_url || '';
+                        const title = camp.title || camp.campaign_name || 'แคมเปญพิเศษ';
+                        const category = camp.category || store.category || '';
+                        const rewardDetails = camp.reward_details || camp.reward || 'รายละเอียดรางวัล';
+                        const pointsCost = camp.points_cost ?? 0;
+                        const campaignType = camp.campaign_type || camp.type || '';
+                        const quotaLimit = camp.quota_limit ?? camp.max_claims ?? camp.total_quota ?? null;
+                        const startDate = formatDateThai(camp.start_date || camp.valid_from);
+                        const endDate = formatDateThai(camp.end_date || camp.expire_date || camp.valid_until);
+                        const extraDesc = camp.additional_description || camp.extra_description || camp.terms || camp.description || '';
+
+                        const lat = camp.lat ?? camp.latitude ?? store.lat ?? null;
+                        const lng = camp.lng ?? camp.longitude ?? store.lng ?? null;
+                        const checkinRadius = camp.checkin_radius ?? camp.radius ?? null;
+                        const isSecretCoupon = Boolean(camp.is_secret_coupon || camp.is_secret || camp.secret_coupon);
+
+                        const isBossMap = Boolean(camp.is_boss_map || camp.enable_boss_map || camp.boss_map_enabled || camp.boss_name);
+                        const bossName = camp.boss_name || camp.event_name || 'กิจกรรม Boss Map';
+                        const bossTargetDistance = camp.boss_target_distance ?? camp.target_distance ?? camp.boss_hp ?? null;
+
+                        const imageHtml = imageUrl ? `
+                            <div class="w-full h-44 sm:h-52 bg-gray-100 overflow-hidden border-b border-gray-100">
+                                <img src="${imageUrl}" alt="${title}" class="w-full h-full object-cover">
+                            </div>
+                        ` : '';
+
+                        const badgesHtml = `
+                            <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                                ${category ? `<span class="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-0.5 rounded-full font-medium">🏷️ ${category}</span>` : ''}
+                                ${campaignType ? `<span class="text-xs bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-medium">📋 ${campaignType}</span>` : ''}
+                                ${isSecretCoupon ? `<span class="text-xs bg-purple-100 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full font-semibold">🤫 คูปองลับ (เฉพาะหน้าร้าน)</span>` : ''}
+                            </div>
+                        `;
+
+                        let metaItems = [];
+                        if (quotaLimit !== null && quotaLimit !== '') {
+                            metaItems.push(`
+                                <div class="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                                    <span class="block text-[11px] text-gray-500">จำนวนสิทธิ์ทั้งหมด</span>
+                                    <span class="font-semibold text-gray-800 text-sm">🎟️ ${quotaLimit} สิทธิ์</span>
+                                </div>
+                            `);
+                        }
+                        if (startDate || endDate) {
+                            const dateText = (startDate && endDate) ? `${startDate} - ${endDate}` : (endDate ? `ถึง ${endDate}` : `เริ่ม ${startDate}`);
+                            metaItems.push(`
+                                <div class="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                                    <span class="block text-[11px] text-gray-500">ระยะเวลาแคมเปญ</span>
+                                    <span class="font-semibold text-gray-800 text-sm">📅 ${dateText}</span>
+                                </div>
+                            `);
+                        }
+                        if (checkinRadius !== null && checkinRadius !== '') {
+                            metaItems.push(`
+                                <div class="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                                    <span class="block text-[11px] text-gray-500">รัศมีเช็กอิน</span>
+                                    <span class="font-semibold text-gray-800 text-sm">📡 ${checkinRadius} เมตร</span>
+                                </div>
+                            `);
+                        }
+
+                        const metaGridHtml = metaItems.length > 0 ? `
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                                ${metaItems.join('')}
+                            </div>
+                        ` : '';
+
+                        const extraDescHtml = (extraDesc && extraDesc.trim() !== '') ? `
+                            <div class="mt-3 bg-amber-50/60 border border-amber-100 rounded-lg p-3">
+                                <span class="block text-xs font-semibold text-amber-900 mb-1">📝 คำอธิบายเพิ่มเติม / เงื่อนไขการใช้งาน</span>
+                                <p class="text-xs text-gray-700 leading-relaxed whitespace-pre-line">${extraDesc}</p>
+                            </div>
+                        ` : '';
+
+                        const bossMapHtml = isBossMap ? `
+                            <div class="mt-3 bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-200 rounded-xl p-3.5">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <span class="text-base">👹</span>
+                                    <span class="text-xs font-bold text-rose-800 uppercase tracking-wide">กิจกรรม Boss Map (เกมสะสมระยะทาง)</span>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mt-2">
+                                    <div class="bg-white/80 rounded-lg px-3 py-2 border border-rose-100">
+                                        <span class="text-gray-500 block text-[11px]">ชื่อบอส / กิจกรรม</span>
+                                        <span class="font-bold text-rose-900 text-sm">${bossName}</span>
+                                    </div>
+                                    ${bossTargetDistance !== null && bossTargetDistance !== '' ? `
+                                    <div class="bg-white/80 rounded-lg px-3 py-2 border border-rose-100">
+                                        <span class="text-gray-500 block text-[11px]">ระยะทางเป้าหมาย</span>
+                                        <span class="font-bold text-rose-900 text-sm">🏃 ${Number(bossTargetDistance).toLocaleString()} เมตร</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        ` : '';
+
+                        const locationHtml = (lat && lng) ? `
+                            <div class="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
+                                <div class="text-xs text-gray-600">
+                                    <span class="font-medium text-gray-700">📌 พิกัดแคมเปญ:</span>
+                                    <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">${lat}, ${lng}</span>
+                                </div>
+                                <button onclick="navigateToCoords(${lat}, ${lng})" class="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                                    <span>🗺️</span>
+                                    <span>นำทางจุดนี้</span>
+                                </button>
+                            </div>
+                        ` : '';
+
+                        // ย้ายปุ่มรับสิทธิ์เข้ามาไว้ในการ์ดแคมเปญ พร้อมส่ง ID และข้อมูลไปประมวลผล
+                        const claimButtonHtml = `
+                            <div class="mt-4 pt-3 border-t border-gray-100">
+                                <button onclick="claimCampaignReward('${campaignId}', ${pointsCost}, '${title.replace(/'/g, "\\'")}')" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-medium shadow hover:bg-emerald-700 transition flex items-center justify-center gap-1.5">
+                                    <span>🎉</span> <span>ร่วมแคมเปญ / ใช้ ${Number(pointsCost).toLocaleString()} พอยต์แลกสิทธิ์</span>
+                                </button>
+                            </div>
+                        `;
+
+                        // ประกอบการ์ดแคมเปญสมบูรณ์
+                        campContainer.innerHTML += `
+                            <article class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
+                                ${imageHtml}
+                                <div class="p-4 sm:p-5">
+                                    ${badgesHtml}
+                                    <div class="flex flex-wrap items-start justify-between gap-2">
+                                        <h3 class="text-lg font-bold text-gray-900">${title}</h3>
+                                        <span class="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold shrink-0">
+                                            🪙 ${Number(pointsCost).toLocaleString()} พอยต์
+                                        </span>
+                                    </div>
+
+                                    <div class="mt-2 bg-emerald-50/70 border border-emerald-100 rounded-lg px-3 py-2">
+                                        <span class="text-[11px] font-medium text-emerald-700 block">🎁 รายละเอียดสิทธิ์ / ของรางวัล</span>
+                                        <p class="text-sm font-semibold text-emerald-950 mt-0.5">${rewardDetails}</p>
+                                    </div>
+
+                                    ${metaGridHtml}
+                                    ${extraDescHtml}
+                                    ${bossMapHtml}
+                                    ${locationHtml}
+                                    ${claimButtonHtml}
+                                </div>
+                            </article>
+                        `;
+                    });
+                } else {
+                    countBadge.innerText = '0 รายการ';
+                    campContainer.innerHTML = `<p class="text-gray-400 text-sm bg-gray-50 p-4 rounded-xl text-center border border-dashed border-gray-200">ขณะนี้ยังไม่มีแคมเปญที่เปิดใช้งาน</p>`;
+                }
+
+            } catch (err) {
+                console.error('เกิดข้อผิดพลาดในการโหลดโปรไฟล์:', err);
+            }
+        }
+
+        function openGoogleMaps() {
+            if (currentStoreData && currentStoreData.lat && currentStoreData.lng) {
+                navigateToCoords(currentStoreData.lat, currentStoreData.lng);
+            } else if (currentCampaigns.length > 0) {
+                const campWithCoords = currentCampaigns.find(c => (c.lat ?? c.latitude) && (c.lng ?? c.longitude));
+                if (campWithCoords) {
+                    navigateToCoords(campWithCoords.lat ?? campWithCoords.latitude, campWithCoords.lng ?? campWithCoords.longitude);
+                    return;
+                }
+                alert('ยังไม่มีข้อมูลพิกัดของร้านค้านี้');
+            } else {
+                alert('ยังไม่มีข้อมูลพิกัดของร้านค้านี้');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', loadStoreProfile);
+    </script>
+</body>
+
+</html>

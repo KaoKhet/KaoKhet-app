@@ -1,58 +1,1107 @@
+// ==========================================
+// ⚡ Supabase Client & Global State
+// ==========================================
 const SUPABASE_URL = 'https://gnkfvgikmbbudvkblcnx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_y7mJl9_LvLkKPOrInpoucg_BN7xR3UI';
 
-const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-window.supabase = supabase;
+let supabaseClient = null;
+if (window.supabase) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
-// เริ่มต้นแผนที่
-let map = null;
+let currentUser = null;
+let currentProfile = {
+  clan: 'green',
+  points: 250,
+  xp: 450,
+  level: 3
+};
 
-document.addEventListener('DOMContentLoaded', () => {
-    initMap();
-    initNavigation();
-});
+let stamina = 100;
+
+// ==========================================
+// 🔐 ระบบล็อกอิน & โปรไฟล์ผู้ใช้จริง (Supabase Auth)
+// ==========================================
+async function handleAuthLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value.trim();
+
+  if (!supabaseClient) {
+    showToast('❌ ไม่พบการเชื่อมต่อฐานข้อมูล Supabase');
+    return;
+  }
+
+  try {
+    let { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) {
+      let signUpRes = await supabaseClient.auth.signUp({ email, password });
+      if (signUpRes.error) {
+        showToast('❌ ล็อกอินไม่สำเร็จ: ' + signUpRes.error.message);
+        return;
+      }
+      data = signUpRes;
+    }
+
+    if (data?.user) {
+      await initUserProfile(data.user);
+      loginSuccess(data.user.email);
+    }
+  } catch (err) {
+    showToast('❌ เกิดข้อผิดพลาดในการเชื่อมต่อระบบสมาชิก');
+  }
+}
+
+async function restoreSessionOnLoad() {
+  if (!supabaseClient || !supabaseClient.auth) return;
+
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session?.user) {
+      const authScreen = document.getElementById('screen-auth');
+      if (authScreen) authScreen.style.display = 'none';
+
+      await initUserProfile(session.user);
+      loginSuccess(session.user.email);
+    }
+  } catch (err) {
+    console.error('Error restoring session:', err);
+  }
+}
+
+async function initUserProfile(user) {
+  currentUser = user;
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  if (error || !data) {
+    const newProfile = {
+      id: user.id,
+      email: user.email,
+      clan: 'green',
+      points: 250,
+      xp: 450,
+      level: 3
+    };
+    await supabaseClient.from('profiles').insert([newProfile]);
+    currentProfile = newProfile;
+  } else {
+    currentProfile = data;
+  }
+
+  currentClan = currentProfile.clan || 'green';
+  localStorage.setItem('strive_clan', currentClan);
+  updateProfileUI();
+  await loadMyCoupons(currentUser?.id);
+}
+
+function updateProfileUI() {
+  const emailDisplay = document.getElementById('profile-email-display');
+  if (emailDisplay && currentUser) emailDisplay.textContent = currentUser.email;
+
+  const lvlEl = document.getElementById('profile-level-display');
+  const xpEl = document.getElementById('profile-xp-display');
+  const pointsEl = document.getElementById('user-points-val');
+  const sponsorPointsEl = document.getElementById('sponsor-user-points');
+  const clanDisplay = document.getElementById('user-clan-display');
+  const detailPoints = document.getElementById('detail-points');
+
+  if (lvlEl) lvlEl.textContent = `🔰 เลเวล ${currentProfile.level}: เจ้าเมืองผู้ชำนาญการ`;
+  if (xpEl) xpEl.textContent = `⭐ สะสม ${currentProfile.xp} / ${currentProfile.level * 200} XP`;
+  if (pointsEl) pointsEl.textContent = `${currentProfile.points.toLocaleString()} Points`;
+  if (sponsorPointsEl) sponsorPointsEl.textContent = `${currentProfile.points.toLocaleString()} Points`;
+  if (detailPoints) detailPoints.textContent = `${currentProfile.points.toLocaleString()} คะแนน`;
+
+  const clanNames = { green: '🟢 Green Forest', blue: '🔵 Blue Ocean', red: '🔴 Red Blaze' };
+  if (clanDisplay) clanDisplay.textContent = clanNames[currentClan] || '🟢 Green Forest';
+}
+
+function loginSuccess(email) {
+  document.getElementById('screen-auth').style.display = 'none';
+  document.getElementById('screen-map').classList.add('active');
+  initMap();
+  showToast(`🎉 ยินดีต้อนรับคุณ ${email}`);
+  checkTerritoryDefenseAlert();
+}
+
+function handleLogout() {
+  currentUser = null;
+  if (supabaseClient) supabaseClient.auth.signOut();
+  document.getElementById('screen-auth').style.display = 'flex';
+  document.getElementById('screen-map').classList.remove('active');
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast-notification');
+  if (toast) {
+    toast.innerText = msg;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3400);
+  }
+}
+
+// 🔔 ระบบแจ้งเตือนพื้นที่ถูกแย่งชิง (Defense Alert)
+function checkTerritoryDefenseAlert() {
+  setTimeout(() => {
+    const alerts = [
+      "⚠️ เตือนภัย! พื้นที่โซนของคุณกำลังถูกแคลนอื่นรุกราน!",
+      "📢 ตรวจพบการเคลื่อนไหวแย่งชิงอาณาเขตในพื้นที่ของคุณ!"
+    ];
+    showToast(alerts[Math.floor(Math.random() * alerts.length)]);
+  }, 4000);
+}
+
+// ==========================================
+// 📱 แผงสไลด์ล่าง 2 ระดับ (สไลด์ขึ้น-ลง) & Camera Shortcut
+// ==========================================
+let isSheetExpanded = false;
+
+function applyBottomSheetState(expanded) {
+  isSheetExpanded = Boolean(expanded);
+  const panel = document.getElementById('bottomPanel');
+  const container = document.getElementById('stats-bottom-sheet');
+  if (!panel) return;
+
+  panel.classList.toggle('panel-collapsed', !isSheetExpanded);
+  panel.classList.toggle('panel-expanded', isSheetExpanded);
+  if (container) {
+    container.classList.toggle('is-expanded', isSheetExpanded);
+  }
+}
+
+function toggleBottomSheet() {
+  applyBottomSheetState(!isSheetExpanded);
+}
+
+function expandBottomSheet() {
+  if (!isSheetExpanded) applyBottomSheetState(true);
+}
+
+function initBottomSheetGestures() {
+  const panel = document.getElementById('bottomPanel');
+  const handle = document.getElementById('dragHandle');
+  if (!panel) return;
+
+  if (handle) {
+    handle.addEventListener('click', toggleBottomSheet);
+  }
+
+  let touchStartY = 0;
+  let touchEndY = 0;
+  panel.addEventListener('touchstart', (e) => {
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      touchStartY = e.changedTouches[0].screenY;
+    }
+  }, { passive: true });
+
+  panel.addEventListener('touchend', (e) => {
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      touchEndY = e.changedTouches[0].screenY;
+      const diff = touchStartY - touchEndY;
+      if (Math.abs(diff) < 20) return;
+      if (diff > 30 && !isSheetExpanded) {
+        applyBottomSheetState(true);
+      } else if (diff < -30 && isSheetExpanded) {
+        applyBottomSheetState(false);
+      }
+    }
+  }, { passive: true });
+}
+
+// ==========================================
+// ☰ เมนูโหมดบนแผนที่แบบปุ่มเดียวขยายออก
+// ==========================================
+let activeSideMode = 'map';
+
+function executeSideMode(mode) {
+  activeSideMode = mode;
+
+  if (mode === 'my-area') {
+    filterMapTerritories('mine');
+  } else if (mode === 'friends') {
+    showToast('👥 โหมดเพื่อน: กำลังแสดงตำแหน่งและเส้นทางเพื่อน');
+  } else if (mode === 'sponsors') {
+    filterMapTerritories('sponsors');
+  } else if (mode === 'fog') {
+    toggleFogOfWar();
+  } else if (mode === 'map') {
+    filterMapTerritories('all');
+  } else if (mode === 'boss') {
+    filterMapTerritories('boss');
+  } else if (mode === 'code') {
+    showToast('📱 โหมดโค้ด: เปิดใช้งานโหมดสแกน/กรอกโค้ด');
+  }
+}
+
+function initSideModeMenu() {
+  const menuToggle = document.getElementById('menuToggle');
+  const menuOverlay = document.getElementById('menuOverlay');
+  const menuContainer = document.getElementById('menuContainer');
+  const menuItems = document.querySelectorAll('.menu-item');
+
+  if (!menuToggle || !menuContainer) return;
+
+  let menuOpen = false;
+
+  function toggleMenu() {
+    menuOpen = !menuOpen;
+    menuToggle.classList.toggle('open', menuOpen);
+    if (menuOverlay) menuOverlay.classList.toggle('open', menuOpen);
+    menuContainer.classList.toggle('open', menuOpen);
+  }
+
+  menuToggle.addEventListener('click', toggleMenu);
+  if (menuOverlay) menuOverlay.addEventListener('click', toggleMenu);
+
+  menuItems.forEach(item => {
+    const label = item.querySelector('.menu-item-label');
+    const icon = item.querySelector('.menu-item-icon');
+    const mode = item.getAttribute('data-mode');
+
+    const selectThisMode = (e) => {
+      e.stopPropagation();
+      menuItems.forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      executeSideMode(mode);
+      if (menuOpen) toggleMenu();
+    };
+
+    if (label) label.addEventListener('click', selectThisMode);
+    if (icon) icon.addEventListener('click', selectThisMode);
+  });
+}
+
+function openCameraShortcutModal() {
+  const modal = document.getElementById('camera-modal');
+  if (!modal) return;
+  document.getElementById('cam-stat-dist').textContent = totalDistance.toFixed(2) + ' กม.';
+  document.getElementById('cam-stat-steps').textContent = `${steps.toLocaleString()} ก้าว | ${Math.round(steps * 0.04)} kcal`;
+  document.getElementById('cam-live-date').textContent = new Date().toLocaleDateString('th-TH');
+  modal.style.display = 'flex';
+}
+
+function closeCameraShortcutModal() {
+  const modal = document.getElementById('camera-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleCameraPhotoSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const previewBox = document.getElementById('camera-preview-box');
+    previewBox.style.backgroundImage = `url('${e.target.result}')`;
+    previewBox.style.backgroundSize = 'cover';
+    previewBox.style.backgroundPosition = 'center';
+    showToast('📸 แนบสถิติลงบนภาพถ่ายเรียบร้อย!');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ==========================================
+// 🛡️ ระบบแคลน & ทีม (Clan & Guild War)
+// ==========================================
+function openClanSelectModal() { document.getElementById('clan-modal').style.display = 'flex'; }
+function closeClanModal() { document.getElementById('clan-modal').style.display = 'none'; }
+
+async function setClan(clanKey) {
+  currentClan = clanKey;
+  localStorage.setItem('strive_clan', clanKey);
+  const clanNames = { green: '🟢 Green Forest', blue: '🔵 Blue Ocean', red: '🔴 Red Blaze' };
+  document.getElementById('user-clan-display').textContent = clanNames[clanKey] || clanKey;
+
+  if (currentUser && supabaseClient) {
+    await supabaseClient.from('profiles').update({ clan: clanKey }).eq('id', currentUser.id);
+  }
+
+  showToast('🛡️ เปลี่ยนแคลนสำเร็จ: ' + clanNames[clanKey]);
+  closeClanModal();
+}
+
+// ==========================================
+// 🎵 ระบบ Music Widget (Piped API Stream)
+// ==========================================
+let currentAudio = null;
+let playlist = [];
+let currentIndex = 0;
+let isPlaying = false;
+
+function openMusicWidget() { document.getElementById('music-widget').style.display = 'block'; }
+function closeMusicWidget() { document.getElementById('music-widget').style.display = 'none'; }
+function minimizeMusicWidget() {
+  document.getElementById('music-widget').style.display = 'none';
+  document.getElementById('music-pill').style.display = 'flex';
+}
+function restoreMusicWidget() {
+  document.getElementById('music-widget').style.display = 'block';
+  document.getElementById('music-pill').style.display = 'none';
+}
+function initMusicSystem() { console.log("Music system initialized."); }
+
+function searchAndPlayMusic() {
+  const searchInput = document.getElementById('widget-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    searchRealMusic(searchInput.value.trim());
+  }
+}
+
+async function searchRealMusic(query) {
+  try {
+    const res = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=music_videos`);
+    const data = await res.json();
+    if (data && data.items && data.items.length > 0) {
+      playlist = data.items.slice(0, 10).map(item => ({
+        title: item.title,
+        artist: item.uploaderName || "Unknown Artist",
+        videoId: item.url.replace('/watch?v=', '')
+      }));
+      renderSearchResults(playlist);
+    } else {
+      showToast("ไม่พบเพลงที่คุณต้องการ");
+    }
+  } catch (err) { console.error(err); }
+}
+
+function renderSearchResults(songs) {
+  const container = document.getElementById('search-results-list');
+  if (!container) return;
+  container.innerHTML = '';
+  songs.forEach((song, index) => {
+    const item = document.createElement('div');
+    item.style.cssText = "display:flex; align-items:center; gap:10px; padding:10px; border-bottom:1px solid #e5e7eb; cursor:pointer;";
+    item.innerHTML = `
+            <div style="width:36px; height:36px; background:#10b981; color:white; border-radius:8px; display:flex; justify-content:center; align-items:center;">🎵</div>
+            <div style="flex:1; overflow:hidden;">
+                <div style="font-size:13px; font-weight:600; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${song.title}</div>
+                <div style="font-size:11px; color:#6b7280;">${song.artist}</div>
+            </div>
+        `;
+    item.onclick = () => selectSongFromList(index);
+    container.appendChild(item);
+  });
+  container.style.display = 'block';
+}
+
+async function selectSongFromList(index) {
+  currentIndex = index;
+  const song = playlist[currentIndex];
+  document.getElementById('search-results-list').style.display = 'none';
+  updateWidgetUI();
+
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  try {
+    const res = await fetch(`https://pipedapi.kavin.rocks/streams/${song.videoId}`);
+    const data = await res.json();
+    if (data.audioStreams && data.audioStreams.length > 0) {
+      currentAudio = new Audio(data.audioStreams[0].url);
+      currentAudio.play().then(() => { isPlaying = true; updatePlayButtonUI(); });
+      currentAudio.onended = () => nextSong();
+    }
+  } catch (err) { console.error(err); }
+}
+
+function togglePlayMusic() {
+  if (!currentAudio) { if (playlist.length > 0) selectSongFromList(currentIndex); return; }
+  if (isPlaying) { currentAudio.pause(); isPlaying = false; }
+  else { currentAudio.play(); isPlaying = true; }
+  updatePlayButtonUI();
+}
+
+function updatePlayButtonUI() {
+  const btn = document.getElementById('widget-play-btn');
+  if (btn) btn.innerText = isPlaying ? '⏸' : '▶';
+}
+
+function nextSong() {
+  if (playlist.length === 0) return;
+  currentIndex = (currentIndex + 1) % playlist.length;
+  selectSongFromList(currentIndex);
+}
+
+function prevSong() {
+  if (playlist.length === 0) return;
+  currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+  selectSongFromList(currentIndex);
+}
+
+function updateWidgetUI() {
+  if (playlist.length === 0) return;
+  const song = playlist[currentIndex];
+  document.getElementById('widget-song-title').innerText = song.title;
+  document.getElementById('widget-artist').innerText = song.artist;
+}
+
+// ==========================================
+// 🗺️ ระบบแผนที่และการติดตาม (Stride Tracking)
+// ==========================================
+let map;
+let isTracking = false;
+let startTime = null;
+let startTimeISO = null;
+let timerInterval = null;
+let totalDistance = 0;
+let lastPosition = null;
+let steps = 0;
+let watchId = null;
+
+let pathCoordinates = [];
+let routePolyline = null;
+let startingPoint = null;
+let isCapturedSuccess = false;
+let userMarker = null;
+
+let territoryLayerGroup = null;
+let landmarkLayerGroup = null;
+let ghostPolyline = null;
+let isGhostModeActive = false;
+let isFogActive = false;
 
 function initMap() {
-    map = L.map('map', { zoomControl: false }).setView([13.688, 100.526], 15);
-    
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+  if (map) {
+    setTimeout(() => map.invalidateSize(), 150);
+    return;
+  }
+  map = L.map('map').setView([13.736717, 100.523186], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  loadCapturedTerritories();
+  renderStrategicLandmarks();
+  loadSponsorNodesOnMap();
+  setTimeout(() => map.invalidateSize(), 150);
+}
+
+function locateUser() {
+  if (!navigator.geolocation) { alert('ไม่รองรับตำแหน่ง'); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      if (map) map.setView([lat, lng], 16);
+      updateUserMarker(lat, lng);
+      const locText = document.getElementById('top-location-text');
+      if (locText) locText.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    },
+    (err) => alert('หาตำแหน่งไม่สำเร็จ: ' + err.message)
+  );
+}
+
+function updateUserMarker(lat, lng) {
+  if (!map) return;
+  if (!userMarker) {
+    userMarker = L.marker([lat, lng], {
+      icon: L.divIcon({ className: 'user-pin', html: '📍', iconSize: [30, 30] })
     }).addTo(map);
-    
-    setTimeout(() => {
-        map.invalidateSize();
-    }, 100);
+  } else {
+    userMarker.setLatLng([lat, lng]);
+  }
 }
 
-function initNavigation() {
-    const navItems = document.querySelectorAll('.nav-item');
-    const screens = document.querySelectorAll('.screen');
-    
-    navItems.forEach(item => {
-        item.addEventListener('click', () => {
-            const targetScreen = item.dataset.screen;
-            
-            // เปลี่ยนสถานะเมนู
-            navItems.forEach(nav => nav.classList.remove('active'));
-            item.classList.add('active');
-            
-            // เปลี่ยนหน้าจอ
-            screens.forEach(screen => screen.classList.remove('active'));
-            document.getElementById(targetScreen).classList.add('active');
-            
-            // ถ้ากลับมาหน้าแผนที่ รีเฟรชแผนที่
-            if (targetScreen === 'screen-map' && map) {
-                setTimeout(() => map.invalidateSize(), 50);
-            }
-        });
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function updateStats() {
+  const distNumberText = totalDistance.toFixed(2);
+  const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+  const timeText = formatTime(elapsed);
+  const calories = Math.round(steps * 0.04);
+  const avgSpeed = elapsed > 0 && totalDistance > 0
+    ? `${(totalDistance / (elapsed / 3600)).toFixed(1)} กม./ชม.`
+    : '— กม./ชม.';
+
+  // ส่วนบน (แสดงตลอดทั้งสองระดับ)
+  const statDistEl = document.getElementById('stat-distance');
+  const statTimeEl = document.getElementById('stat-time');
+  const statStepsEl = document.getElementById('stat-steps');
+  const statCalEl = document.getElementById('stat-cal');
+  if (statDistEl) statDistEl.textContent = distNumberText;
+  if (statTimeEl) statTimeEl.textContent = timeText;
+  if (statStepsEl) statStepsEl.textContent = steps.toLocaleString();
+  if (statCalEl) statCalEl.textContent = calories;
+
+  // แถบความคืบหน้า / พลังงาน
+  const staminaTextEl = document.getElementById('stat-stamina-text');
+  const staminaPercentEl = document.getElementById('stat-stamina-percent');
+  const staminaFillEl = document.getElementById('stat-stamina-fill');
+  if (staminaTextEl) staminaTextEl.textContent = `ความคืบหน้า: ${stamina}/100 คะแนน`;
+  if (staminaPercentEl) staminaPercentEl.textContent = `${stamina}%`;
+  if (staminaFillEl) staminaFillEl.style.width = `${stamina}%`;
+
+  // ส่วนรายละเอียดเพิ่มเติม (เมื่อสไลด์ขยายขึ้น)
+  const detailDistEl = document.getElementById('detail-distance');
+  const detailTimeEl = document.getElementById('detail-time');
+  const detailSpeedEl = document.getElementById('detail-speed');
+  const detailStepsEl = document.getElementById('detail-steps');
+  const detailCalEl = document.getElementById('detail-cal');
+  const detailPointsEl = document.getElementById('detail-points');
+
+  if (detailDistEl) detailDistEl.textContent = `${distNumberText} กม.`;
+  if (detailTimeEl) detailTimeEl.textContent = timeText;
+  if (detailSpeedEl) detailSpeedEl.textContent = avgSpeed;
+  if (detailStepsEl) detailStepsEl.textContent = `${steps.toLocaleString()} ก้าว`;
+  if (detailCalEl) detailCalEl.textContent = `${calories} kcal`;
+  if (detailPointsEl) detailPointsEl.textContent = `${(currentProfile.points || 0).toLocaleString()} คะแนน`;
+}
+
+function startTracking() {
+  if (stamina <= 0) {
+    showToast('⚠️ พลังงาน (Stamina) ของคุณหมดแล้ว!');
+    return;
+  }
+
+  isTracking = true;
+  startTime = Date.now();
+  startTimeISO = new Date().toISOString();
+  totalDistance = 0;
+  lastPosition = null;
+  steps = 0;
+  pathCoordinates = [];
+  startingPoint = null;
+  isCapturedSuccess = false;
+
+  if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+
+  const startBtn = document.getElementById('start-btn');
+  startBtn.textContent = 'STOP';
+  startBtn.classList.add('tracking');
+
+  timerInterval = setInterval(updateStats, 1000);
+
+  if (navigator.geolocation) {
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => { processNewCoordinate(pos.coords.latitude, pos.coords.longitude); },
+      (err) => console.log('GPS error:', err.message),
+      { enableHighAccuracy: true, maximumAge: 1000, distanceFilter: 1 }
+    );
+  }
+}
+
+function processNewCoordinate(lat, lng) {
+  updateUserMarker(lat, lng);
+  checkSponsorNodesProximity(lat, lng);
+  const currentLatLng = [lat, lng];
+
+  if (!startingPoint) {
+    startingPoint = { lat, lng };
+    L.circleMarker(currentLatLng, { color: '#3b82f6', radius: 6, fillOpacity: 0.8 })
+      .addTo(map).bindPopup('จุดเริ่มต้นออกตัว 🚀');
+  }
+
+  if (lastPosition) {
+    const dist = map.distance([lastPosition.lat, lastPosition.lng], currentLatLng) / 1000;
+    totalDistance += dist;
+    if (dist > 0.0005) {
+      steps += Math.floor(dist * 1300);
+      stamina = Math.max(0, stamina - 1);
+    }
+
+    if (totalDistance > 0.1 && startingPoint) {
+      const distanceToStart = map.distance(currentLatLng, [startingPoint.lat, startingPoint.lng]);
+      if (distanceToStart < 15 && !isCapturedSuccess) {
+        isCapturedSuccess = true;
+        addPlayerXP(100);
+        showToast('🎉 ยินดีด้วย! คุณเดินวนครบรอบและยึดครองพื้นที่สำเร็จ! (+100 XP)');
+      }
+    }
+  }
+
+  lastPosition = { lat, lng };
+  pathCoordinates.push(currentLatLng);
+
+  const clanColors = { green: '#22c55e', blue: '#3b82f6', red: '#ef4444' };
+  if (!routePolyline) {
+    routePolyline = L.polyline(pathCoordinates, { color: clanColors[currentClan] || '#22c55e', weight: 5, opacity: 0.8 }).addTo(map);
+  } else {
+    routePolyline.setLatLngs(pathCoordinates);
+  }
+
+  map.setView(currentLatLng, map.getZoom());
+}
+
+async function checkSponsorNodesProximity(userLat, userLng) {
+  if (!supabaseClient || !currentUser) return;
+
+  try {
+    const { data: campaigns } = await supabaseClient
+      .from('campaigns')
+      .select('id, title, lat, lng, node_radius, is_secret_node, reward_details')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null);
+
+    if (!campaigns) return;
+
+    campaigns.forEach(async camp => {
+      const distanceMeters = map.distance([userLat, userLng], [camp.lat, camp.lng]);
+      const radius = camp.node_radius || 50;
+
+      if (distanceMeters <= radius) {
+        const cacheKey = `checked_node_${currentUser.id}_${camp.id}`;
+        if (localStorage.getItem(cacheKey)) return;
+
+        localStorage.setItem(cacheKey, 'true');
+        showToast(`🎉 คุณเดินมาถึงป้อมปราการ "${camp.title}" แล้ว! ปลดล็อกสิทธิ์พิเศษสำเร็จ!`);
+      }
     });
+  } catch (err) {
+    console.error('Error checking proximity:', err);
+  }
 }
 
-function startJourney() {
-    alert('🚀 เริ่มบันทึกการเดินทาง! (ต่อไปจะเชื่อมกับ GPS)');
+async function addPlayerXP(amount) {
+  currentProfile.xp += amount;
+  currentProfile.level = Math.floor(currentProfile.xp / 200) + 1;
+  updateProfileUI();
+
+  if (currentUser && supabaseClient) {
+    await supabaseClient.from('profiles').update({
+      xp: currentProfile.xp,
+      level: currentProfile.level
+    }).eq('id', currentUser.id);
+  }
 }
 
-function toggleMenu() {
-    alert('เมนูอื่นๆ จะมาเร็วๆ นี้ครับ!');
+function renderStrategicLandmarks() {
+  if (!map) return;
+  if (landmarkLayerGroup) map.removeLayer(landmarkLayerGroup);
+  landmarkLayerGroup = L.layerGroup();
+
+  const mockLandmarks = [
+    { lat: 13.738, lng: 100.525, name: '🏰 หอคอยโบนัสแต้ม x2' },
+    { lat: 13.734, lng: 100.520, name: '⚡ จุดฟื้นฟูพลังงาน Stamina' }
+  ];
+
+  mockLandmarks.forEach(lm => {
+    const marker = L.marker([lm.lat, lm.lng], {
+      icon: L.divIcon({ className: 'landmark-pin', html: '⭐', iconSize: [28, 28] })
+    }).bindPopup(`<b>${lm.name}</b><br>ยึดพื้นที่ทับจุดนี้รับโบนัสพิเศษ!`);
+    landmarkLayerGroup.addLayer(marker);
+  });
+  landmarkLayerGroup.addTo(map);
+}
+
+function toggleGhostMode() {
+  isGhostModeActive = !isGhostModeActive;
+  if (isGhostModeActive) {
+    showToast('👻 เปิดโหมด Ghost (แสดงเส้นทางอ้างอิง)');
+    const ghostCoords = [[13.7367, 100.5231], [13.7380, 100.5231], [13.7380, 100.5250], [13.7367, 100.5250]];
+    ghostPolyline = L.polyline(ghostCoords, { color: '#9ca3af', weight: 4, dashArray: '5, 5', opacity: 0.8 }).addTo(map);
+  } else {
+    showToast('ปิดโหมด Ghost แล้ว');
+    if (ghostPolyline) { map.removeLayer(ghostPolyline); ghostPolyline = null; }
+  }
+}
+
+function toggleFogOfWar() {
+  isFogActive = !isFogActive;
+  showToast(isFogActive ? '🌫️ เปิดใช้งานหมอกสำรวจพื้นที่' : 'ปิดหมอกสำรวจ');
+}
+
+function filterMapTerritories(type) { showToast('🌐 ตัวกรองแผนที่: ' + type); }
+
+async function loadCapturedTerritories() {
+  if (!map || !supabaseClient) return;
+
+  if (!territoryLayerGroup) {
+    territoryLayerGroup = L.layerGroup().addTo(map);
+  } else {
+    territoryLayerGroup.clearLayers();
+  }
+
+  try {
+    const { data: territories, error } = await supabaseClient
+      .from('journeys')
+      .select('*')
+      .eq('is_captured', true);
+
+    if (error || !territories) return;
+
+    territories.forEach((item) => {
+      if (item.path_coordinates && item.path_coordinates.length > 2) {
+        L.polygon(item.path_coordinates, {
+          color: '#16a34a', fillColor: '#22c55e', fillOpacity: 0.35, weight: 2
+        }).addTo(territoryLayerGroup);
+      }
+    });
+  } catch (err) { console.error(err); }
+}
+
+function stopTracking() {
+  isTracking = false;
+  clearInterval(timerInterval);
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+
+  const startBtn = document.getElementById('start-btn');
+  startBtn.textContent = 'STRIDE';
+  startBtn.classList.remove('tracking');
+
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  document.getElementById('modal-steps').textContent = steps;
+  document.getElementById('modal-distance').textContent = totalDistance.toFixed(2) + ' กม.';
+  document.getElementById('modal-time').textContent = formatTime(elapsed);
+  document.getElementById('summary-modal').style.display = 'flex';
+}
+
+function resetModal() {
+  document.getElementById('summary-modal').style.display = 'none';
+  totalDistance = 0; steps = 0; startTime = null; startTimeISO = null;
+  lastPosition = null; startingPoint = null; pathCoordinates = []; isCapturedSuccess = false;
+  if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+  updateStats();
+}
+
+function resumeTracking() {
+  document.getElementById('summary-modal').style.display = 'none';
+  isTracking = true;
+  timerInterval = setInterval(updateStats, 1000);
+  const startBtn = document.getElementById('start-btn');
+  startBtn.textContent = 'STOP';
+  startBtn.classList.add('tracking');
+}
+
+function openShareModal() {
+  document.getElementById('summary-modal').style.display = 'none';
+  document.getElementById('share-stat-dist').textContent = `ระยะทาง: ${totalDistance.toFixed(2)} กม.`;
+  document.getElementById('share-stat-steps').textContent = `${steps} ก้าวเดิน`;
+  document.getElementById('share-modal').style.display = 'flex';
+}
+
+function closeShareModal() { document.getElementById('share-modal').style.display = 'none'; }
+
+async function finishActivity() {
+  closeShareModal();
+  if (!supabaseClient || !currentUser) {
+    alert('⚠️ กรุณาล็อกอินเข้าระบบก่อนบันทึกข้อมูล');
+    resetModal();
+    return;
+  }
+
+  const endedAtISO = new Date().toISOString();
+  const distanceInMeters = Math.round(totalDistance * 1000);
+
+  const tripData = {
+    user_id: currentUser.id,
+    started_at: startTimeISO || endedAtISO,
+    ended_at: endedAtISO,
+    distance_meters: distanceInMeters,
+    steps: steps,
+    path_coordinates: pathCoordinates,
+    is_captured: isCapturedSuccess
+  };
+
+  try {
+    const { error } = await supabaseClient.from('journeys').insert([tripData]);
+    if (error) {
+      showToast('❌ บันทึกไม่สำเร็จ: ' + error.message);
+    } else {
+      await addPlayerXP(Math.floor(totalDistance * 50));
+      showToast('✅ บันทึกกิจกรรมลง Supabase สำเร็จ!');
+    }
+    loadCapturedTerritories();
+  } catch (err) {
+    showToast('❌ เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+  }
+  resetModal();
+}
+
+// ==========================================
+// 📱 Navigation & Screen Loaders
+// ==========================================
+function switchScreen(screenId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`[data-screen="${screenId}"]`).classList.add('active');
+
+  if (screenId === 'screen-map' && map) setTimeout(() => map.invalidateSize(), 200);
+  if (screenId === 'screen-history') loadHistoryData();
+  if (screenId === 'screen-leaderboard') loadLeaderboardData('area');
+  if (screenId === 'screen-profile') updateProfileUI();
+  if (screenId === 'screen-coupons') loadMyCoupons(currentUser?.id);
+  if (screenId === 'screen-sponsors') {
+    if (typeof initShopModule === 'function') {
+      initShopModule();
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initMusicSystem();
+  initBottomSheetGestures();
+  initSideModeMenu();
+  restoreSessionOnLoad();
+
+  const btnLoc = document.getElementById('btn-location');
+  if (btnLoc) btnLoc.addEventListener('click', locateUser);
+
+  const startBtn = document.getElementById('start-btn');
+  if (startBtn) startBtn.addEventListener('click', () => {
+    if (isTracking) stopTracking();
+    else startTracking();
+  });
+
+  const modalReset = document.getElementById('modal-reset');
+  if (modalReset) modalReset.addEventListener('click', resetModal);
+
+  const modalResume = document.getElementById('modal-resume');
+  if (modalResume) modalResume.addEventListener('click', resumeTracking);
+
+  // 📱 ย้ายการดักจับคลิกแถบเมนูล่างมาไว้ที่นี่ เพื่อให้ทำงานหลังจาก DOM โหลดเสร็จเรียบร้อย 100%
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const screenId = item.getAttribute('data-screen');
+      if (screenId) {
+        switchScreen(screenId);
+      }
+
+      // จัดการคลาส active และขีดแสดงสถานะ
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+
+      // เอฟเฟกต์เด้งดึ๋งตอนกดไอคอน
+      const icon = item.querySelector('.nav-icon');
+      if (icon) {
+        icon.style.transform = 'scale(1.25)';
+        setTimeout(() => {
+          icon.style.transform = item.classList.contains('active') ? 'scale(1.12)' : '';
+        }, 150);
+      }
+    });
+  });
+});
+
+// ดึงประวัติการเดินทางจริงจากตาราง journeys
+async function loadHistoryData() {
+  const container = document.getElementById('history-list-container');
+  if (!container || !supabaseClient || !currentUser) return;
+
+  container.innerHTML = '<div style="text-align:center; color:#9ca3af; padding:30px 0;">⏳ กำลังโหลดประวัติจากคลาวด์...</div>';
+
+  try {
+    const { data: journeys, error } = await supabaseClient
+      .from('journeys')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('started_at', { ascending: false });
+
+    if (error || !journeys || journeys.length === 0) {
+      container.innerHTML = '<div style="text-align:center; color:#9ca3af; padding:40px 0;">ยังไม่มีประวัติการเดินทาง</div>';
+      return;
+    }
+
+    let totalDistMeters = 0, totalStepsCount = 0, totalCapturedCount = 0, html = '';
+
+    journeys.forEach(item => {
+      const distKm = (item.distance_meters / 1000) || 0;
+      const stepVal = item.steps || 0;
+      totalDistMeters += item.distance_meters || 0;
+      totalStepsCount += stepVal;
+      if (item.is_captured) totalCapturedCount++;
+
+      const dateObj = new Date(item.started_at);
+      const dateStr = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+      const timeStr = dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+      const badge = item.is_captured
+        ? `<span style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:600;">👑 ยึดพื้นที่สำเร็จ</span>`
+        : `<span style="background:#f3f4f6; color:#6b7280; font-size:11px; padding:3px 8px; border-radius:12px;">🚶 บันทึกการเดิน</span>`;
+
+      html += `
+        <div style="background:#fff; border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f3f4f6;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div><span style="font-size:14px; font-weight:700; color:#1f2937;">📅 ${dateStr}</span><span style="font-size:12px; color:#9ca3af; margin-left:6px;">${timeStr} น.</span></div>
+            ${badge}
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; background:#f9fafb; padding:10px; border-radius:12px; text-align:center;">
+            <div><div style="font-size:10px; color:#6b7280;">ระยะทาง</div><div style="font-size:14px; font-weight:700; color:#1f2937;">${distKm.toFixed(2)} กม.</div></div>
+            <div><div style="font-size:10px; color:#6b7280;">ก้าวเดิน</div><div style="font-size:14px; font-weight:700; color:#1f2937;">${stepVal.toLocaleString()}</div></div>
+            <div><div style="font-size:10px; color:#6b7280;">สถานะ</div><div style="font-size:14px; font-weight:700; color:#16a34a;">สำเร็จ</div></div>
+          </div>
+        </div>
+      `;
+    });
+
+    document.getElementById('total-stat-distance').textContent = (totalDistMeters / 1000).toFixed(2) + ' กม.';
+    document.getElementById('total-stat-steps').textContent = totalStepsCount.toLocaleString();
+    document.getElementById('total-stat-captured').textContent = totalCapturedCount + ' โซน';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<div style="text-align:center; color:#ef4444; padding:20px;">❌ โหลดข้อมูลประวัติไม่สำเร็จ</div>';
+  }
+}
+
+async function loadLeaderboardData(type) {
+  const container = document.getElementById('leaderboard-list-container');
+  if (!container || !supabaseClient) return;
+
+  try {
+    const { data: profiles, error } = await supabaseClient
+      .from('profiles')
+      .select('email, clan, xp, level')
+      .order('xp', { ascending: false })
+      .limit(10);
+
+    if (error || !profiles) return;
+
+    let html = '';
+    profiles.forEach((p, idx) => {
+      const rankBadge = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+      html += `
+        <div style="background:#fff; border-radius:14px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; border:1px solid #f3f4f6; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-weight:bold; color:#eab308;">${rankBadge}</span>
+            <span style="font-size:13px; font-weight:600;">${p.email} [${(p.clan || 'green').toUpperCase()}]</span>
+          </div>
+          <span style="font-weight:700; color:#22c55e;">${p.xp} XP (Lv.${p.level || 1})</span>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  } catch (err) { console.error(err); }
+}
+
+function switchLeaderboardTab(type) {
+  document.getElementById('lb-tab-area').style.background = type === 'area' ? '#22c55e' : '#fff';
+  document.getElementById('lb-tab-area').style.color = type === 'area' ? '#fff' : '#4b5563';
+  document.getElementById('lb-tab-dist').style.background = type === 'distance' ? '#22c55e' : '#fff';
+  document.getElementById('lb-tab-dist').style.color = type === 'distance' ? '#fff' : '#4b5563';
+  loadLeaderboardData(type);
+}
+
+// ตัวแปรเก็บ Layer Group สำหรับร้านค้าและบอสบนแผนที่
+let sponsorNodesLayerGroup = null;
+
+async function loadSponsorNodesOnMap() {
+  if (!map || !supabaseClient) return;
+
+  if (!sponsorNodesLayerGroup) {
+    sponsorNodesLayerGroup = L.layerGroup().addTo(map);
+  } else {
+    sponsorNodesLayerGroup.clearLayers();
+  }
+
+  try {
+    const { data: campaigns, error } = await supabaseClient
+      .from('campaigns')
+      .select('*')
+      .eq('is_active', true)
+      .not('lat', 'is', null)
+      .not('lng', 'is', null);
+
+    if (error || !campaigns) return;
+
+    const groupedCampaigns = {};
+    campaigns.forEach(camp => {
+      const key = `${camp.lat}_${camp.lng}`;
+      if (!groupedCampaigns[key]) {
+        groupedCampaigns[key] = {
+          lat: camp.lat,
+          lng: camp.lng,
+          storeId: camp.sponsor_id || camp.created_by || '',
+          merchantName: camp.merchant_name || 'Stride Partner',
+          items: []
+        };
+      }
+      groupedCampaigns[key].items.push(camp);
+    });
+
+    Object.values(groupedCampaigns).forEach(group => {
+      const isBossGroup = group.items.some(i => i.is_raid_boss);
+      const isSecretGroup = group.items.some(i => i.is_secret_node);
+
+      let pinIcon = '🏪';
+      let pinClass = 'sponsor-pin';
+      if (isBossGroup) {
+        pinIcon = '👹';
+        pinClass = 'boss-pin';
+      } else if (isSecretGroup) {
+        pinIcon = '🥷';
+        pinClass = 'secret-pin';
+      }
+
+      const marker = L.marker([group.lat, group.lng], {
+        icon: L.divIcon({
+          className: pinClass,
+          html: `<div style="background:white; border-radius:50%; width:34px; height:34px; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,0.3); font-size:18px;">${pinIcon}</div>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        })
+      });
+
+      let popupHtml = `
+        <div style="text-align:center; min-width:200px;">
+          <div style="font-size:13px; font-weight:800; color:#3b82f6; margin-bottom:4px;">${group.merchantName}</div>
+          <div style="border-top:1px solid #e5e7eb; margin-bottom:8px;"></div>
+      `;
+
+      group.items.forEach(camp => {
+        const safeRewardAttr = encodeURIComponent(camp.reward_details || 'สิทธิ์พิเศษ');
+        const safeCampaignId = String(camp.id || '').replace(/'/g, "\\'");
+        const isBoss = camp.is_raid_boss;
+        const isSecret = camp.is_secret_node;
+
+        popupHtml += `
+          <div style="background:#f9fafb; padding:8px; border-radius:8px; margin-bottom:8px; text-align:left; border-left:4px solid #22c55e;">
+            <div style="font-size:13px; font-weight:700; color:#1f2937;">${camp.title || ''}</div>
+            <div style="font-size:11px; color:#16a34a; font-weight:600; margin:2px 0;">🎁 ${camp.reward_details || 'สิทธิ์พิเศษ'}</div>
+        `;
+
+        if (isBoss) {
+          const progress = Number(camp.current_distance_km || 0);
+          const target = Number(camp.target_distance_km || 500);
+          popupHtml += `
+            <div style="background:#fffbeb; border:1px solid #fde68a; padding:4px; border-radius:6px; font-size:10px; margin-top:4px;">
+              <b>👹 บอส: ${camp.boss_name || 'บอสประจำถิ่น'}</b><br>
+              ความคืบหน้า: ${progress.toFixed(1)} / ${target} กม.
+            </div>
+          `;
+        } else if (isSecret) {
+          popupHtml += `
+            <div style="font-size:10px; color:#d97706; background:#fef3c7; padding:2px 4px; border-radius:4px; margin-top:4px;">
+              🥷 คูปองลับ: ต้องเช็กอินหน้าร้านเท่านั้น!
+            </div>
+          `;
+        }
+
+        popupHtml += `
+            <button onclick="handleClaimCampaign('${safeCampaignId}', decodeURIComponent('${safeRewardAttr}'))" style="margin-top:6px; background:#22c55e; color:white; border:none; padding:5px 8px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; width:100%;">
+              🪙 แลกรับ (${camp.points_cost || 0} Pts)
+            </button>
+          </div>
+        `;
+      });
+
+      if (group.storeId) {
+        const safeStoreId = String(group.storeId).replace(/'/g, "\\'");
+        popupHtml += `
+          <button onclick="goToStoreProfile('${safeStoreId}')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; width:100%; margin-top:4px;">
+            🏪 ดูโปรไฟล์ร้านค้า
+          </button>
+        `;
+      }
+
+      popupHtml += `</div>`;
+
+      marker.bindPopup(popupHtml);
+      sponsorNodesLayerGroup.addLayer(marker);
+
+      const maxRadius = Math.max(...group.items.map(i => i.node_radius || 50));
+      L.circle([group.lat, group.lng], {
+        radius: maxRadius,
+        interactive: false,
+        color: isBossGroup ? '#ef4444' : (isSecretGroup ? '#d97706' : '#3b82f6'),
+        fillColor: isBossGroup ? '#ef4444' : (isSecretGroup ? '#d97706' : '#3b82f6'),
+        fillOpacity: 0.15,
+        weight: 1
+      }).addTo(sponsorNodesLayerGroup);
+    });
+  } catch (err) {
+    console.error('Error loading sponsor nodes on map:', err);
+  }
 }
