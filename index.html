@@ -71,7 +71,7 @@
       </div>
       <div style="position:relative; margin-bottom:12px;">
         <div style="display:flex; gap:6px;">
-          <input type="text" id="widget-search-input" placeholder="🔍 พิมพ์ชื่อเพลงหรือศิลปิน..."
+          <input type="text" id="widget-search-input" placeholder="🔍 พิม์ชื่อเพลงหรือศิลปิน..."
             style="flex:1; padding:8px 12px; border:1px solid #e5e7eb; border-radius:12px; font-size:12px; outline:none;" />
           <button onclick="searchAndPlayMusic()"
             style="background:#10b981; color:white; border:none; padding:8px 14px; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">ค้นหา</button>
@@ -184,9 +184,9 @@
             title="ถ่ายภาพ & แนบสถิติ">📸</button>
         </div>
 
-        <!-- ส่วนล่าง — แสดงเฉพาะตอนขยาย -->
-        <div class="expanded-details">
-          <div class="detail-grid">
+        <!-- ส่วนล่าง — แสดงเฉพาะตอนขยาย (จัด Grid 2 คอลัมน์สมดุลและเลื่อนดูได้ไม่ล้น) -->
+        <div class="expanded-details" style="max-height: 215px; overflow-y: auto; padding-right: 2px;">
+          <div class="detail-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
             <div class="detail-card">
               <div class="detail-label">ระยะทางรวม</div>
               <div class="detail-value" id="detail-distance">0.00 กม.</div>
@@ -196,8 +196,24 @@
               <div class="detail-value" id="detail-time">00:00</div>
             </div>
             <div class="detail-card">
+              <div class="detail-label">เพซเฉลี่ย (Pace)</div>
+              <div class="detail-value" id="detail-pace">— min/km</div>
+            </div>
+            <div class="detail-card">
               <div class="detail-label">ความเร็วเฉลี่ย</div>
               <div class="detail-value" id="detail-speed">— กม./ชม.</div>
+            </div>
+            <div class="detail-card">
+              <div class="detail-label">อัตราการเต้นหัวใจ</div>
+              <div class="detail-value" id="detail-heart">— bpm</div>
+            </div>
+            <div class="detail-card">
+              <div class="detail-label">ความสูงสะสม</div>
+              <div class="detail-value" id="detail-elevation">0 ม.</div>
+            </div>
+            <div class="detail-card">
+              <div class="detail-label">รอบขา (Cadence)</div>
+              <div class="detail-value" id="detail-cadence">0 spm</div>
             </div>
             <div class="detail-card">
               <div class="detail-label">จำนวนก้าว</div>
@@ -213,8 +229,10 @@
             </div>
           </div>
         </div>
+
       </div>
     </div>
+
   </div>
 
   <!-- ==========================================
@@ -256,7 +274,8 @@
     <!-- ภารกิจประจำวัน (Daily Quests) -->
     <div
       style="background:#fff; border-radius:18px; padding:16px; margin-bottom:20px; border:1px solid #f3f4f6; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-      <div style="font-size:14px; font-weight:700; margin-bottom:10px; color:#1f2937;">📜 ภารกิจวันนี้ (Daily Quests)
+      <div style="font-size:14px; font-weight:700; margin-bottom:10px; color:#1f2937;">📜 ภารกิจวันนี้ (Daily
+        Quests)
       </div>
       <div id="quest-list-container">
         <div
@@ -316,7 +335,7 @@
         </button>
       </div>
 
-      <!-- แถบปุ่ม 3 ปุ่มที่แก้ไขชื่อฟังก์ชันให้ถูกต้องตาม shopUI.js แล้ว -->
+      <!-- แถบปุ่ม 3 ปุ่ม -->
       <div class="merchant-actions-grid">
         <button id="btn-scan-qr" onclick="handleScanQRClick()" class="merchant-action-btn btn-scan">
           <span>📷</span>
@@ -363,7 +382,8 @@
             แต้มสะสมของคุณ (Stride Balance)</div>
           <div id="sponsor-user-points"
             style="font-size: 28px; font-weight: 800; margin-top: 4px; letter-spacing: -0.5px;">0 Points</div>
-          <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">🎁 แลกรับส่วนลดและของรางวัลพิเศษได้ที่นี่</div>
+          <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">🎁 แลกรับส่วนลดและของรางวัลพิเศษได้ที่นี่
+          </div>
         </div>
         <div
           style="font-size: 36px; background: rgba(255,255,255,0.15); width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
@@ -396,34 +416,6 @@
 
       <div class="coupon-stack" id="my-coupons-container">
         <p style="color: #9ca3af; font-size: 13px; text-align: center; padding: 10px;">กำลังโหลดคูปองของคุณ...</p>
-      </div>
-    </div>
-
-    <!-- หน้าต่างแสดง QR / รหัสคูปองเมื่อกดที่การ์ด -->
-    <div id="use-coupon-modal"
-      style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:3000; align-items:center; justify-content:center; padding:16px;">
-      <div
-        style="background:#ffffff; color:#111827; border-radius:20px; padding:20px; width:100%; max-width:340px; text-align:center; box-shadow:0 12px 32px rgba(0,0,0,0.35);">
-        <div style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:#168039; margin-bottom:4px;">STRIDE
-          PRIVILEGE COUPON</div>
-        <h3 id="modal-coupon-title" style="font-size:16px; font-weight:700; margin-bottom:12px;">คูปองส่วนลด Stride</h3>
-
-        <img id="modal-coupon-qr" src="" alt="QR Code"
-          style="width:148px; height:148px; margin:0 auto 10px; display:block; border-radius:10px; border:1px solid #e5e7eb; padding:6px; background:#fff;">
-
-        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">ยื่นให้พนักงานสแกนหรือกรอกรหัสนี้</div>
-        <div id="modal-coupon-code"
-          style="font-size:16px; font-weight:800; color:#ea580c; font-family:monospace; letter-spacing:0.05em; margin-bottom:10px;">
-          STRIDE-COUPON</div>
-
-        <div id="modal-coupon-details"
-          style="font-size:12px; color:#374151; background:#f9fafb; border-radius:10px; padding:8px 10px; margin-bottom:14px; text-align:left; line-height:1.45;">
-        </div>
-
-        <button type="button" onclick="closeUseCouponModal()"
-          style="width:100%; padding:10px 14px; border-radius:9999px; border:1px solid #d1d5db; background:#f3f4f6; color:#374151; font-size:13px; font-weight:700; cursor:pointer;">
-          ปิดหน้าต่าง
-        </button>
       </div>
     </div>
 
@@ -507,7 +499,7 @@
       style="width:100%; padding:12px; background:#ef4444; color:white; border:none; border-radius:12px; font-weight:700; cursor:pointer;">ออกจากระบบ</button>
   </div>
 
-  <!-- 📱 แถบเมนูด้านล่างแบบโมเดิร์นพร้อมแอนิเมชัน (ใช้แท็ก button เพื่อความเสถียรของระบบเดิม) -->
+  <!-- 📱 แถบเมนูด้านล่างแบบโมเดิร์นพร้อมแอนิเมชัน -->
   <nav class="bottom-nav">
     <button type="button" class="nav-item active" data-screen="screen-map">
       <div class="nav-icon">
@@ -605,6 +597,35 @@
     </div>
   </div>
 
+  <!-- หน้าต่างแสดง QR / รหัสคูปองเมื่อกดที่การ์ด -->
+  <div id="use-coupon-modal"
+    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:3000; align-items:center; justify-content:center; padding:16px;">
+    <div
+      style="background:#ffffff; color:#111827; border-radius:20px; padding:20px; width:100%; max-width:340px; text-align:center; box-shadow:0 12px 32px rgba(0,0,0,0.35);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:#168039; margin-bottom:4px;">
+        STRIDE PRIVILEGE COUPON</div>
+      <h3 id="modal-coupon-title" style="font-size:16px; font-weight:700; margin-bottom:12px;">คูปองส่วนลด Stride
+      </h3>
+
+      <img id="modal-coupon-qr" src="" alt="QR Code"
+        style="width:148px; height:148px; margin:0 auto 10px; display:block; border-radius:10px; border:1px solid #e5e7eb; padding:6px; background:#fff;">
+
+      <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">ยื่นให้พนักงานสแกนหรือกรอกรหัสนี้</div>
+      <div id="modal-coupon-code"
+        style="font-size:16px; font-weight:800; color:#ea580c; font-family:monospace; letter-spacing:0.05em; margin-bottom:10px;">
+        STRIDE-COUPON</div>
+
+      <div id="modal-coupon-details"
+        style="font-size:12px; color:#374151; background:#f9fafb; border-radius:10px; padding:8px 10px; margin-bottom:14px; text-align:left; line-height:1.45;">
+      </div>
+
+      <button type="button" onclick="closeUseCouponModal()"
+        style="width:100%; padding:10px 14px; border-radius:9999px; border:1px solid #d1d5db; background:#f3f4f6; color:#374151; font-size:13px; font-weight:700; cursor:pointer;">
+        ปิดหน้าต่าง
+      </button>
+    </div>
+  </div>
+
   <div id="clan-modal"
     style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;">
     <div style="background:#fff;border-radius:24px;padding:24px;max-width:340px;width:100%;">
@@ -628,7 +649,8 @@
     style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); z-index:2800; align-items:center; justify-content:center; padding:15px;">
     <div style="background:#fff; border-radius:24px; padding:20px; max-width:340px; width:100%; text-align:center;">
       <h3 style="font-size:18px; margin-bottom:10px; color:#1f2937;">📸 ถ่ายภาพสถิติ Stride</h3>
-      <div style="font-size:11px; color:#6b7280; margin-bottom:12px;">เลือกภาพจากกล้องหรืออัปโหลดเพื่อแนบสถิติวิ่ง</div>
+      <div style="font-size:11px; color:#6b7280; margin-bottom:12px;">เลือกภาพจากกล้องหรืออัปโหลดเพื่อแนบสถิติวิ่ง
+      </div>
 
       <div id="camera-preview-box"
         style="background:linear-gradient(135deg, #111 0%, #1f2937 100%); color:white; border-radius:16px; padding:18px; margin-bottom:14px; min-height:200px; display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden; border:2px solid #22c55e;">
@@ -656,25 +678,119 @@
     </div>
   </div>
 
+  <!-- 📸 Modal Studio แต่งภาพและแชร์สถิติ Full Option -->
   <div id="share-modal"
-    style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:2500;align-items:center;justify-content:center;padding:15px;">
-    <div style="background:#fff;border-radius:24px;padding:20px;max-width:340px;width:100%;text-align:center;">
-      <h3 style="font-size:18px;margin-bottom:10px;">📸 แชร์สถิติลงโซเชียล</h3>
+    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:3500; align-items:center; justify-content:center; padding:14px; backdrop-filter:blur(4px);">
+    <div
+      style="background:#fff; border-radius:24px; padding:18px; max-width:380px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 45px rgba(0,0,0,0.35);">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="font-size:17px; font-weight:800; color:#1f2937; margin:0;">🎨 Stride Photo Studio</h3>
+        <button type="button" onclick="closeShareModal()"
+          style="background:#f3f4f6; border:none; width:28px; height:28px; border-radius:50%; font-size:15px; font-weight:bold; cursor:pointer;">✕</button>
+      </div>
+
+      <!-- พื้นที่พรีวิวภาพที่จะ Export -->
       <div id="share-preview-box"
-        style="background:#111;color:white;border-radius:16px;padding:20px;margin-bottom:14px;min-height:180px;display:flex;flex-direction:column;justify-content:space-between;">
-        <div style="font-size:12px;opacity:0.8;">🟢 Strive Territory Game</div>
-        <div>
-          <div id="share-stat-dist" style="font-size:20px; font-weight:800;">ระยะทาง: 0.00 กม.</div>
-          <div id="share-stat-steps" style="font-size:12px; opacity:0.9;">0 ก้าวเดิน</div>
+        style="position:relative; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:18px; padding:18px; margin-bottom:12px; min-height:240px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; background-size:cover; background-position:center; box-shadow:0 8px 20px rgba(0,0,0,0.2);">
+
+        <!-- เลเยอร์เงาไล่ระดับให้อ่านตัวหนังสือชัดบนรูปถ่าย -->
+        <div
+          style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.55) 100%); pointer-events:none;">
+        </div>
+
+        <!-- ส่วนหัว: โลโก้แบรนด์ Stride & วันที่ -->
+        <div style="position:relative; z-index:1; display:flex; justify-content:space-between; align-items:center;">
+          <div id="preview-brand-badge"
+            style="display:flex; align-items:center; gap:6px; background:rgba(34,197,94,0.2); border:1px solid rgba(34,197,94,0.5); padding:4px 10px; border-radius:20px; font-size:11px; font-weight:800; color:#4ade80;">
+            <span>🏃</span><span>STRIDE</span>
+          </div>
+          <span id="preview-date-text" style="font-size:11px; opacity:0.85; font-weight:600;">วันนี้</span>
+        </div>
+
+        <!-- ส่วนกลาง: ชื่อกิจกรรม -->
+        <div style="position:relative; z-index:1; margin:16px 0 8px 0;">
+          <div id="preview-activity-title" style="font-size:13px; font-weight:700; color:#e2e8f0; margin-bottom:4px;">🏃
+            วิ่งออกกำลังกายทั่วไป</div>
+          <div id="preview-main-dist"
+            style="font-size:32px; font-weight:900; color:#22c55e; line-height:1.1; letter-spacing:-0.5px;">0.00 กม.
+          </div>
+        </div>
+
+        <!-- ส่วนล่าง: ตารางสถิติที่เลือกเปิดแสดง -->
+        <div id="preview-stats-grid"
+          style="position:relative; z-index:1; display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; border-top:1px solid rgba(255,255,255,0.2); padding-top:10px; font-size:11px;">
+          <!-- เติมค่าอัตโนมัติจาก photoModule.js -->
         </div>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button onclick="closeShareModal()"
-          style="flex:1;padding:10px;background:#f3f4f6;border:none;border-radius:10px;cursor:pointer;font-weight:600;">ปิด</button>
-        <button onclick="finishActivity()"
-          style="flex:1;padding:10px;background:#22c55e;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:700;">บันทึก
-          & แชร์</button>
+
+      <!-- ปุ่มเลือกรูปพื้นหลัง -->
+      <input type="file" id="studio-photo-input" accept="image/*" style="display:none;"
+        onchange="handleStudioPhotoUpload(event)" />
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button type="button" onclick="document.getElementById('studio-photo-input').click()"
+          style="flex:1; padding:9px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
+          🖼️ เลือกรูปถ่ายพื้นหลัง
+        </button>
+        <button type="button" onclick="resetStudioBackground()"
+          style="padding:9px 12px; background:#f3f4f6; color:#4b5563; border:none; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer;">
+          รีเซ็ตพื้นหลัง
+        </button>
       </div>
+
+      <!-- แผงติ๊กเลือกเปิด/ปิดข้อมูลสถิติ (Customize Stats) -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px; margin-bottom:14px;">
+        <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:8px;">🎛️
+          เลือกข้อมูลที่ต้องการแสดงบนภาพ:</div>
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; font-size:12px; color:#1e293b;">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" class="studio-stat-toggle" value="time" checked onchange="renderStudioPreview()"> ⏱️
+            เวลาที่ใช้
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" class="studio-stat-toggle" value="pace" checked onchange="renderStudioPreview()"> ⚡
+            เพซ (Pace)
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" class="studio-stat-toggle" value="steps" checked onchange="renderStudioPreview()"> 🚶
+            ก้าวเดิน
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" class="studio-stat-toggle" value="calories" checked onchange="renderStudioPreview()">
+            🔥 แคลอรี
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" class="studio-stat-toggle" value="cadence" onchange="renderStudioPreview()"> 👟 รอบขา
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" class="studio-stat-toggle" value="heart" onchange="renderStudioPreview()"> ❤️ ชีพจร
+          </label>
+          <label
+            style="display:flex; align-items:center; gap:6px; cursor:pointer; grid-column:span 2; border-top:1px dashed #cbd5e1; padding-top:4px; margin-top:2px;">
+            <input type="checkbox" id="toggle-brand-logo" checked onchange="renderStudioPreview()"> 🏷️ แสดงโลโก้แบรนด์
+            STRIDE
+          </label>
+        </div>
+      </div>
+
+      <!-- ปุ่ม Action ด้านล่าง -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; gap:8px;">
+          <button type="button" onclick="downloadStudioImage()"
+            style="flex:1; padding:11px; background:#0f172a; color:white; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">
+            💾 บันทึกรูปลงเครื่อง
+          </button>
+          <button type="button" onclick="shareStudioImageNative()"
+            style="flex:1; padding:11px; background:#3b82f6; color:white; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">
+            📤 แชร์รูปภาพ
+          </button>
+        </div>
+        <button type="button" id="btn-studio-save-db" onclick="finishActivity()"
+          style="width:100%; padding:12px; background:#22c55e; color:white; border:none; border-radius:12px; font-size:14px; font-weight:800; cursor:pointer;">
+          ✅ บันทึกกิจกรรมลงระบบ & เสร็จสิ้น
+        </button>
+      </div>
+
     </div>
   </div>
 
@@ -724,7 +840,8 @@
 
         <div id="campaign-form-view" style="display:none;">
           <div style="display:flex; align-items:center; justify-content:between; margin-bottom:12px;">
-            <h4 id="form-mode-title" style="font-size:15px; font-weight:700; color:#374151; margin:0;">✨ เพิ่มแคมเปญใหม่
+            <h4 id="form-mode-title" style="font-size:15px; font-weight:700; color:#374151; margin:0;">✨
+              เพิ่มแคมเปญใหม่
             </h4>
             <button onclick="backToCampaignList()"
               style="background:none; border:none; color:#3b82f6; font-size:12px; font-weight:600; cursor:pointer;">←
@@ -756,7 +873,8 @@
 
             <div style="margin-bottom:12px;">
               <label
-                style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">ชื่อแคมเปญ /
+                style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">ชื่อแคมเปญ
+                /
                 ส่วนลด</label>
               <input type="text" id="sponsor-title" placeholder="เช่น ส่วนลด 50 บาท กาแฟเครื่องดื่ม" class="auth-input"
                 required />
@@ -876,7 +994,8 @@
                 <input type="checkbox" id="sponsor-is-raid" onchange="toggleRaidBossFields()"
                   style="width: 18px; height: 18px; cursor: pointer;" />
                 <label for="sponsor-is-raid"
-                  style="font-size: 13px; font-weight: 700; color: #dc2626; cursor: pointer;">🐲 เปิดใช้งานกิจกรรม Boss
+                  style="font-size: 13px; font-weight: 700; color: #dc2626; cursor: pointer;">🐲 เปิดใช้งานกิจกรรม
+                  Boss
                   Map (เรดบอสสะสมระยะทาง)</label>
               </div>
 
@@ -923,7 +1042,8 @@
         style="background:linear-gradient(135deg, #1e1e2f 0%, #2a2a3e 100%); color:white; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:18px;">📋</span>
-          <h3 style="font-size:16px; font-weight:700; margin:0; letter-spacing:-0.2px;">ประวัติและการตรวจสอบคูปองทั้งหมด
+          <h3 style="font-size:16px; font-weight:700; margin:0; letter-spacing:-0.2px;">
+            ประวัติและการตรวจสอบคูปองทั้งหมด
           </h3>
         </div>
         <button onclick="closeMerchantHistoryModal()"
@@ -985,6 +1105,7 @@
   <script src="couponModule.js"></script>
   <script src="merchantModule.js"></script>
   <script src="notificationModule.js"></script>
+  <script src="photoModule.js"></script>
 </body>
 
 </html>

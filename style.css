@@ -588,6 +588,30 @@ h2 {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
+/* 1. ปรับความสูงและพื้นที่ของแถบเมนูด้านล่างให้โปร่งและรองรับอนิเมชัน */
+.bottom-nav {
+  height: 80px;
+  /* เพิ่มความสูงจากเดิม (เช่น 60px เป็น 70px) */
+  padding-bottom: env(safe-area-inset-bottom, 10px);
+  /* รองรับขอบจอมือถือรุ่นใหม่ */
+}
+
+/* ปรับระยะห่างด้านล่างของหน้าจอทุกหน้าไม่ให้โดนแถบเมนูบังและเผื่อที่ให้อนิเมชัน */
+.page {
+  padding-bottom: 95px !important;
+}
+
+/* 2. เพิ่มเอฟเฟกต์ Fade Gradient ที่กล่องสกรอลล์สถิติ เพื่อบอกว่ามีข้อมูลด้านล่าง */
+.expanded-details {
+  position: relative;
+  max-height: 215px;
+  overflow-y: auto;
+  padding-right: 2px;
+  /* ทำขอบจางด้านล่าง (Fade out) เพื่อสื่อว่าเลื่อนลงดูต่อได้ */
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+}
+
 /* ===== ส่วนร้านค้า / คูปอง / แคมเปญ / ผู้ประกอบการ ===== */
 #my-coupons-list {
   display: grid;

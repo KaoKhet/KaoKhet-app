@@ -10,8 +10,9 @@ if (window.supabase) {
 }
 
 let currentUser = null;
+let currentClan = localStorage.getItem('strive_clan') || 'green';
 let currentProfile = {
-  clan: 'green',
+  clan: currentClan,
   points: 250,
   xp: 450,
   level: 3
@@ -22,13 +23,8 @@ let stamina = 100;
 // ==========================================
 // 🛡️ ระบบจัดการเลเยอร์กลาง (Dynamic Layer Manager)
 // ==========================================
-let globalZIndexCounter = 3000; // ค่าเริ่มต้นความสูงของเลเยอร์ ให้อยู่เหนือแผนที่และ UI หลัก
+let globalZIndexCounter = 3000;
 
-/**
- * ฟังก์ชันเปิด Modal หรือหน้าต่างทับซ้อน พร้อมดันให้อยู่เลเยอร์บนสุดอัตโนมัติ
- * @param {string} modalId - ไอดีของ Element ที่ต้องการเปิด
- * @param {string} displayStyle - รูปแบบการแสดงผล เช่น 'flex' หรือ 'block'
- */
 function openTopLayer(modalId, displayStyle = 'flex') {
   const targetElement = document.getElementById(modalId);
   if (!targetElement) {
@@ -40,10 +36,6 @@ function openTopLayer(modalId, displayStyle = 'flex') {
   targetElement.style.display = displayStyle;
 }
 
-/**
- * ฟังก์ชันปิด Modal
- * @param {string} modalId - ไอดีของ Element ที่ต้องการปิด
- */
 function closeTopLayer(modalId) {
   const targetElement = document.getElementById(modalId);
   if (targetElement) {
@@ -127,7 +119,9 @@ async function initUserProfile(user) {
   currentClan = currentProfile.clan || 'green';
   localStorage.setItem('strive_clan', currentClan);
   updateProfileUI();
-  await loadMyCoupons(currentUser?.id);
+  if (typeof loadMyCoupons === 'function') {
+    await loadMyCoupons(currentUser?.id);
+  }
 }
 
 function updateProfileUI() {
@@ -175,7 +169,6 @@ function showToast(msg) {
   }
 }
 
-// 🔔 ระบบแจ้งเตือนพื้นที่ถูกแย่งชิง (Defense Alert)
 function checkTerritoryDefenseAlert() {
   setTimeout(() => {
     const alerts = [
@@ -187,7 +180,7 @@ function checkTerritoryDefenseAlert() {
 }
 
 // ==========================================
-// 📱 แผงสไลด์ล่าง 2 ระดับ & Camera Shortcut
+// 📱 แผงสไลด์ล่าง 2 ระดับ
 // ==========================================
 let isSheetExpanded = false;
 
@@ -304,35 +297,6 @@ function initSideModeMenu() {
     if (label) label.addEventListener('click', selectThisMode);
     if (icon) icon.addEventListener('click', selectThisMode);
   });
-}
-
-// 📸 จัดการ Modal ถ่ายภาพสถิติผ่านระบบเลเยอร์กลาง
-function openCameraShortcutModal() {
-  const modal = document.getElementById('camera-modal');
-  if (!modal) return;
-  document.getElementById('cam-stat-dist').textContent = totalDistance.toFixed(2) + ' กม.';
-  document.getElementById('cam-stat-steps').textContent = `${steps.toLocaleString()} ก้าว | ${Math.round(steps * 0.04)} kcal`;
-  document.getElementById('cam-live-date').textContent = new Date().toLocaleDateString('th-TH');
-
-  openTopLayer('camera-modal', 'flex');
-}
-
-function closeCameraShortcutModal() {
-  closeTopLayer('camera-modal');
-}
-
-function handleCameraPhotoSelected(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    const previewBox = document.getElementById('camera-preview-box');
-    previewBox.style.backgroundImage = `url('${e.target.result}')`;
-    previewBox.style.backgroundSize = 'cover';
-    previewBox.style.backgroundPosition = 'center';
-    showToast('📸 แนบสถิติลงบนภาพถ่ายเรียบร้อย!');
-  };
-  reader.readAsDataURL(file);
 }
 
 // ==========================================
@@ -503,6 +467,8 @@ let ghostPolyline = null;
 let isGhostModeActive = false;
 let isFogActive = false;
 
+window.getTotalStats = () => ({ distance: totalDistance, steps: steps });
+
 function initMap() {
   if (map) {
     setTimeout(() => map.invalidateSize(), 150);
@@ -559,6 +525,15 @@ function updateStats() {
     ? `${(totalDistance / (elapsed / 3600)).toFixed(1)} กม./ชม.`
     : '— กม./ชม.';
 
+  let paceText = '— min/km';
+  if (totalDistance > 0.01 && elapsed > 0) {
+    const paceTotalSec = elapsed / totalDistance;
+    const paceMin = Math.floor(paceTotalSec / 60);
+    const paceSec = Math.floor(paceTotalSec % 60).toString().padStart(2, '0');
+    paceText = `${paceMin}:${paceSec} min/km`;
+  }
+  const cadenceVal = elapsed > 0 ? Math.round((steps / elapsed) * 60) : 0;
+
   const statDistEl = document.getElementById('stat-distance');
   const statTimeEl = document.getElementById('stat-time');
   const statStepsEl = document.getElementById('stat-steps');
@@ -577,14 +552,18 @@ function updateStats() {
 
   const detailDistEl = document.getElementById('detail-distance');
   const detailTimeEl = document.getElementById('detail-time');
+  const detailPaceEl = document.getElementById('detail-pace');
   const detailSpeedEl = document.getElementById('detail-speed');
+  const detailCadenceEl = document.getElementById('detail-cadence');
   const detailStepsEl = document.getElementById('detail-steps');
   const detailCalEl = document.getElementById('detail-cal');
   const detailPointsEl = document.getElementById('detail-points');
 
   if (detailDistEl) detailDistEl.textContent = `${distNumberText} กม.`;
   if (detailTimeEl) detailTimeEl.textContent = timeText;
+  if (detailPaceEl) detailPaceEl.textContent = paceText;
   if (detailSpeedEl) detailSpeedEl.textContent = avgSpeed;
+  if (detailCadenceEl) detailCadenceEl.textContent = `${cadenceVal} spm`;
   if (detailStepsEl) detailStepsEl.textContent = `${steps.toLocaleString()} ก้าว`;
   if (detailCalEl) detailCalEl.textContent = `${calories} kcal`;
   if (detailPointsEl) detailPointsEl.textContent = `${(currentProfile.points || 0).toLocaleString()} คะแนน`;
@@ -782,7 +761,7 @@ function stopTracking() {
   startBtn.textContent = 'STRIDE';
   startBtn.classList.remove('tracking');
 
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
   document.getElementById('modal-steps').textContent = steps;
   document.getElementById('modal-distance').textContent = totalDistance.toFixed(2) + ' กม.';
   document.getElementById('modal-time').textContent = formatTime(elapsed);
@@ -807,21 +786,13 @@ function resumeTracking() {
   startBtn.classList.add('tracking');
 }
 
-// 📸 จัดการ Modal แชร์สถิติผ่านระบบเลเยอร์กลาง
-function openShareModal() {
-  closeTopLayer('summary-modal');
-  document.getElementById('share-stat-dist').textContent = `ระยะทาง: ${totalDistance.toFixed(2)} กม.`;
-  document.getElementById('share-stat-steps').textContent = `${steps} ก้าวเดิน`;
-
-  openTopLayer('share-modal', 'flex');
-}
-
-function closeShareModal() {
-  closeTopLayer('share-modal');
-}
-
 async function finishActivity() {
-  closeShareModal();
+  if (typeof closeShareModal === 'function') {
+    closeShareModal();
+  } else {
+    closeTopLayer('share-modal');
+  }
+
   if (!supabaseClient || !currentUser) {
     alert('⚠️ กรุณาล็อกอินเข้าระบบก่อนบันทึกข้อมูล');
     resetModal();
@@ -829,16 +800,35 @@ async function finishActivity() {
   }
 
   const endedAtISO = new Date().toISOString();
+  const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
   const distanceInMeters = Math.round(totalDistance * 1000);
+  const calories = Math.round(steps * 0.04);
 
+  // คำนวณค่าสถิติเชิงลึก (Deep Stats) สำหรับบันทึกฐานข้อมูล
+  let paceStr = '0:00';
+  if (totalDistance > 0.01 && elapsed > 0) {
+    const paceTotalSec = elapsed / totalDistance;
+    const paceMin = Math.floor(paceTotalSec / 60);
+    const paceSec = Math.floor(paceTotalSec % 60).toString().padStart(2, '0');
+    paceStr = `${paceMin}:${paceSec}`;
+  }
+  const cadenceVal = elapsed > 0 ? Math.round((steps / elapsed) * 60) : 0;
+
+  // Payload ข้อมูลทั้งหมดที่จะส่งเข้าตาราง journeys ใน Supabase
   const tripData = {
     user_id: currentUser.id,
     started_at: startTimeISO || endedAtISO,
     ended_at: endedAtISO,
     distance_meters: distanceInMeters,
     steps: steps,
+    calories: calories,
+    pace: paceStr,
+    cadence: cadenceVal,
+    elevation_gain: 0,       // รองรับข้อมูลความสูงสะสม
+    avg_heart_rate: 125,     // ค่าเฉลี่ยชีพจร (หรือค่าจำลองมาตรฐาน)
     path_coordinates: pathCoordinates,
-    is_captured: isCapturedSuccess
+    is_captured: isCapturedSuccess,
+    activity_title: isCapturedSuccess ? 'วิ่งยึดพื้นที่สำเร็จ 👑' : 'วิ่งออกกำลังกายทั่วไป 🏃'
   };
 
   try {
@@ -847,7 +837,7 @@ async function finishActivity() {
       showToast('❌ บันทึกไม่สำเร็จ: ' + error.message);
     } else {
       await addPlayerXP(Math.floor(totalDistance * 50));
-      showToast('✅ บันทึกกิจกรรมลง Supabase สำเร็จ!');
+      showToast('✅ บันทึกสถิติเชิงลึกเข้า Supabase สำเร็จ!');
     }
     loadCapturedTerritories();
   } catch (err) {
@@ -860,64 +850,25 @@ async function finishActivity() {
 // 📱 Navigation & Screen Loaders
 // ==========================================
 function switchScreen(screenId) {
+  const targetScreen = document.getElementById(screenId);
+  if (!targetScreen) return;
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(screenId).classList.add('active');
+  targetScreen.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.querySelector(`[data-screen="${screenId}"]`).classList.add('active');
+  const navBtn = document.querySelector(`[data-screen="${screenId}"]`);
+  if (navBtn) navBtn.classList.add('active');
 
   if (screenId === 'screen-map' && map) setTimeout(() => map.invalidateSize(), 200);
   if (screenId === 'screen-history') loadHistoryData();
   if (screenId === 'screen-leaderboard') loadLeaderboardData('area');
   if (screenId === 'screen-profile') updateProfileUI();
-  if (screenId === 'screen-coupons') loadMyCoupons(currentUser?.id);
   if (screenId === 'screen-sponsors') {
     if (typeof initShopModule === 'function') {
       initShopModule();
     }
   }
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  initMusicSystem();
-  initBottomSheetGestures();
-  initSideModeMenu();
-  restoreSessionOnLoad();
-
-  const btnLoc = document.getElementById('btn-location');
-  if (btnLoc) btnLoc.addEventListener('click', locateUser);
-
-  const startBtn = document.getElementById('start-btn');
-  if (startBtn) startBtn.addEventListener('click', () => {
-    if (isTracking) stopTracking();
-    else startTracking();
-  });
-
-  const modalReset = document.getElementById('modal-reset');
-  if (modalReset) modalReset.addEventListener('click', resetModal);
-
-  const modalResume = document.getElementById('modal-resume');
-  if (modalResume) modalResume.addEventListener('click', resumeTracking);
-
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const screenId = item.getAttribute('data-screen');
-      if (screenId) {
-        switchScreen(screenId);
-      }
-
-      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
-
-      const icon = item.querySelector('.nav-icon');
-      if (icon) {
-        icon.style.transform = 'scale(1.25)';
-        setTimeout(() => {
-          icon.style.transform = item.classList.contains('active') ? 'scale(1.12)' : '';
-        }, 150);
-      }
-    });
-  });
-});
 
 async function loadHistoryData() {
   const container = document.getElementById('history-list-container');
@@ -954,17 +905,23 @@ async function loadHistoryData() {
         ? `<span style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:600;">👑 ยึดพื้นที่สำเร็จ</span>`
         : `<span style="background:#f3f4f6; color:#6b7280; font-size:11px; padding:3px 8px; border-radius:12px;">🚶 บันทึกการเดิน</span>`;
 
+      const encodedItem = encodeURIComponent(JSON.stringify(item));
+
       html += `
         <div style="background:#fff; border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f3f4f6;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <div><span style="font-size:14px; font-weight:700; color:#1f2937;">📅 ${dateStr}</span><span style="font-size:12px; color:#9ca3af; margin-left:6px;">${timeStr} น.</span></div>
             ${badge}
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; background:#f9fafb; padding:10px; border-radius:12px; text-align:center;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; background:#f9fafb; padding:10px; border-radius:12px; text-align:center; margin-bottom:10px;">
             <div><div style="font-size:10px; color:#6b7280;">ระยะทาง</div><div style="font-size:14px; font-weight:700; color:#1f2937;">${distKm.toFixed(2)} กม.</div></div>
             <div><div style="font-size:10px; color:#6b7280;">ก้าวเดิน</div><div style="font-size:14px; font-weight:700; color:#1f2937;">${stepVal.toLocaleString()}</div></div>
-            <div><div style="font-size:10px; color:#6b7280;">สถานะ</div><div style="font-size:14px; font-weight:700; color:#16a34a;">สำเร็จ</div></div>
+            <div><div style="font-size:10px; color:#6b7280;">เพซเฉลี่ย</div><div style="font-size:14px; font-weight:700; color:#16a34a;">${item.pace || '—'}</div></div>
           </div>
+          <button type="button" onclick="openHistoryShareModal(JSON.parse(decodeURIComponent('${encodedItem}')))"
+            style="width:100%; padding:8px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
+            📸 สร้างการ์ดภาพแชร์สถิติรอบนี้
+          </button>
         </div>
       `;
     });
@@ -1145,4 +1102,74 @@ async function loadSponsorNodesOnMap() {
   } catch (err) {
     console.error('Error loading sponsor nodes on map:', err);
   }
+}
+
+// ==========================================
+// 📱 Safe Initialization & Event Binding
+// ==========================================
+let _strideAppInitialized = false;
+
+function initStrideApp() {
+  if (_strideAppInitialized) return;
+  _strideAppInitialized = true;
+
+  initMusicSystem();
+  initBottomSheetGestures();
+  initSideModeMenu();
+  restoreSessionOnLoad();
+
+  const btnLoc = document.getElementById('btn-location');
+  if (btnLoc) btnLoc.addEventListener('click', locateUser);
+
+  const startBtn = document.getElementById('start-btn');
+  if (startBtn) {
+    startBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isTracking) stopTracking();
+      else startTracking();
+    });
+  }
+
+  const modalReset = document.getElementById('modal-reset');
+  if (modalReset) {
+    modalReset.addEventListener('click', (e) => {
+      e.preventDefault();
+      resetModal();
+    });
+  }
+
+  const modalResume = document.getElementById('modal-resume');
+  if (modalResume) {
+    modalResume.addEventListener('click', (e) => {
+      e.preventDefault();
+      resumeTracking();
+    });
+  }
+
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.currentTarget.blur();
+      const screenId = item.getAttribute('data-screen');
+      if (screenId) {
+        switchScreen(screenId);
+      }
+
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+
+      const icon = item.querySelector('.nav-icon');
+      if (icon) {
+        icon.style.transform = 'scale(1.25)';
+        setTimeout(() => {
+          icon.style.transform = item.classList.contains('active') ? 'scale(1.12)' : '';
+        }, 150);
+      }
+    });
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initStrideApp);
+} else {
+  initStrideApp();
 }
