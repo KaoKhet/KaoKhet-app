@@ -20,6 +20,38 @@ let currentProfile = {
 let stamina = 100;
 
 // ==========================================
+// 🛡️ ระบบจัดการเลเยอร์กลาง (Dynamic Layer Manager)
+// ==========================================
+let globalZIndexCounter = 3000; // ค่าเริ่มต้นความสูงของเลเยอร์ ให้อยู่เหนือแผนที่และ UI หลัก
+
+/**
+ * ฟังก์ชันเปิด Modal หรือหน้าต่างทับซ้อน พร้อมดันให้อยู่เลเยอร์บนสุดอัตโนมัติ
+ * @param {string} modalId - ไอดีของ Element ที่ต้องการเปิด
+ * @param {string} displayStyle - รูปแบบการแสดงผล เช่น 'flex' หรือ 'block'
+ */
+function openTopLayer(modalId, displayStyle = 'flex') {
+  const targetElement = document.getElementById(modalId);
+  if (!targetElement) {
+    console.warn(`ไม่พบ Element ID: ${modalId}`);
+    return;
+  }
+  globalZIndexCounter += 10;
+  targetElement.style.zIndex = globalZIndexCounter;
+  targetElement.style.display = displayStyle;
+}
+
+/**
+ * ฟังก์ชันปิด Modal
+ * @param {string} modalId - ไอดีของ Element ที่ต้องการปิด
+ */
+function closeTopLayer(modalId) {
+  const targetElement = document.getElementById(modalId);
+  if (targetElement) {
+    targetElement.style.display = 'none';
+  }
+}
+
+// ==========================================
 // 🔐 ระบบล็อกอิน & โปรไฟล์ผู้ใช้จริง (Supabase Auth)
 // ==========================================
 async function handleAuthLogin(e) {
@@ -155,7 +187,7 @@ function checkTerritoryDefenseAlert() {
 }
 
 // ==========================================
-// 📱 แผงสไลด์ล่าง 2 ระดับ (สไลด์ขึ้น-ลง) & Camera Shortcut
+// 📱 แผงสไลด์ล่าง 2 ระดับ & Camera Shortcut
 // ==========================================
 let isSheetExpanded = false;
 
@@ -274,18 +306,19 @@ function initSideModeMenu() {
   });
 }
 
+// 📸 จัดการ Modal ถ่ายภาพสถิติผ่านระบบเลเยอร์กลาง
 function openCameraShortcutModal() {
   const modal = document.getElementById('camera-modal');
   if (!modal) return;
   document.getElementById('cam-stat-dist').textContent = totalDistance.toFixed(2) + ' กม.';
   document.getElementById('cam-stat-steps').textContent = `${steps.toLocaleString()} ก้าว | ${Math.round(steps * 0.04)} kcal`;
   document.getElementById('cam-live-date').textContent = new Date().toLocaleDateString('th-TH');
-  modal.style.display = 'flex';
+
+  openTopLayer('camera-modal', 'flex');
 }
 
 function closeCameraShortcutModal() {
-  const modal = document.getElementById('camera-modal');
-  if (modal) modal.style.display = 'none';
+  closeTopLayer('camera-modal');
 }
 
 function handleCameraPhotoSelected(event) {
@@ -305,8 +338,12 @@ function handleCameraPhotoSelected(event) {
 // ==========================================
 // 🛡️ ระบบแคลน & ทีม (Clan & Guild War)
 // ==========================================
-function openClanSelectModal() { document.getElementById('clan-modal').style.display = 'flex'; }
-function closeClanModal() { document.getElementById('clan-modal').style.display = 'none'; }
+function openClanSelectModal() {
+  openTopLayer('clan-modal', 'flex');
+}
+function closeClanModal() {
+  closeTopLayer('clan-modal');
+}
 
 async function setClan(clanKey) {
   currentClan = clanKey;
@@ -330,15 +367,21 @@ let playlist = [];
 let currentIndex = 0;
 let isPlaying = false;
 
-function openMusicWidget() { document.getElementById('music-widget').style.display = 'block'; }
-function closeMusicWidget() { document.getElementById('music-widget').style.display = 'none'; }
+function openMusicWidget() {
+  openTopLayer('music-widget', 'block');
+}
+function closeMusicWidget() {
+  closeTopLayer('music-widget');
+}
 function minimizeMusicWidget() {
-  document.getElementById('music-widget').style.display = 'none';
-  document.getElementById('music-pill').style.display = 'flex';
+  closeTopLayer('music-widget');
+  const pill = document.getElementById('music-pill');
+  if (pill) pill.style.display = 'flex';
 }
 function restoreMusicWidget() {
-  document.getElementById('music-widget').style.display = 'block';
-  document.getElementById('music-pill').style.display = 'none';
+  openTopLayer('music-widget', 'block');
+  const pill = document.getElementById('music-pill');
+  if (pill) pill.style.display = 'none';
 }
 function initMusicSystem() { console.log("Music system initialized."); }
 
@@ -516,7 +559,6 @@ function updateStats() {
     ? `${(totalDistance / (elapsed / 3600)).toFixed(1)} กม./ชม.`
     : '— กม./ชม.';
 
-  // ส่วนบน (แสดงตลอดทั้งสองระดับ)
   const statDistEl = document.getElementById('stat-distance');
   const statTimeEl = document.getElementById('stat-time');
   const statStepsEl = document.getElementById('stat-steps');
@@ -526,7 +568,6 @@ function updateStats() {
   if (statStepsEl) statStepsEl.textContent = steps.toLocaleString();
   if (statCalEl) statCalEl.textContent = calories;
 
-  // แถบความคืบหน้า / พลังงาน
   const staminaTextEl = document.getElementById('stat-stamina-text');
   const staminaPercentEl = document.getElementById('stat-stamina-percent');
   const staminaFillEl = document.getElementById('stat-stamina-fill');
@@ -534,7 +575,6 @@ function updateStats() {
   if (staminaPercentEl) staminaPercentEl.textContent = `${stamina}%`;
   if (staminaFillEl) staminaFillEl.style.width = `${stamina}%`;
 
-  // ส่วนรายละเอียดเพิ่มเติม (เมื่อสไลด์ขยายขึ้น)
   const detailDistEl = document.getElementById('detail-distance');
   const detailTimeEl = document.getElementById('detail-time');
   const detailSpeedEl = document.getElementById('detail-speed');
@@ -732,6 +772,7 @@ async function loadCapturedTerritories() {
   } catch (err) { console.error(err); }
 }
 
+// 📋 จัดการเปิด Modal สรุปกิจกรรมผ่านระบบเลเยอร์กลาง
 function stopTracking() {
   isTracking = false;
   clearInterval(timerInterval);
@@ -745,11 +786,12 @@ function stopTracking() {
   document.getElementById('modal-steps').textContent = steps;
   document.getElementById('modal-distance').textContent = totalDistance.toFixed(2) + ' กม.';
   document.getElementById('modal-time').textContent = formatTime(elapsed);
-  document.getElementById('summary-modal').style.display = 'flex';
+
+  openTopLayer('summary-modal', 'flex');
 }
 
 function resetModal() {
-  document.getElementById('summary-modal').style.display = 'none';
+  closeTopLayer('summary-modal');
   totalDistance = 0; steps = 0; startTime = null; startTimeISO = null;
   lastPosition = null; startingPoint = null; pathCoordinates = []; isCapturedSuccess = false;
   if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
@@ -757,7 +799,7 @@ function resetModal() {
 }
 
 function resumeTracking() {
-  document.getElementById('summary-modal').style.display = 'none';
+  closeTopLayer('summary-modal');
   isTracking = true;
   timerInterval = setInterval(updateStats, 1000);
   const startBtn = document.getElementById('start-btn');
@@ -765,14 +807,18 @@ function resumeTracking() {
   startBtn.classList.add('tracking');
 }
 
+// 📸 จัดการ Modal แชร์สถิติผ่านระบบเลเยอร์กลาง
 function openShareModal() {
-  document.getElementById('summary-modal').style.display = 'none';
+  closeTopLayer('summary-modal');
   document.getElementById('share-stat-dist').textContent = `ระยะทาง: ${totalDistance.toFixed(2)} กม.`;
   document.getElementById('share-stat-steps').textContent = `${steps} ก้าวเดิน`;
-  document.getElementById('share-modal').style.display = 'flex';
+
+  openTopLayer('share-modal', 'flex');
 }
 
-function closeShareModal() { document.getElementById('share-modal').style.display = 'none'; }
+function closeShareModal() {
+  closeTopLayer('share-modal');
+}
 
 async function finishActivity() {
   closeShareModal();
@@ -852,7 +898,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalResume = document.getElementById('modal-resume');
   if (modalResume) modalResume.addEventListener('click', resumeTracking);
 
-  // 📱 ย้ายการดักจับคลิกแถบเมนูล่างมาไว้ที่นี่ เพื่อให้ทำงานหลังจาก DOM โหลดเสร็จเรียบร้อย 100%
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => {
       const screenId = item.getAttribute('data-screen');
@@ -860,11 +905,9 @@ document.addEventListener('DOMContentLoaded', () => {
         switchScreen(screenId);
       }
 
-      // จัดการคลาส active และขีดแสดงสถานะ
       document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
       item.classList.add('active');
 
-      // เอฟเฟกต์เด้งดึ๋งตอนกดไอคอน
       const icon = item.querySelector('.nav-icon');
       if (icon) {
         icon.style.transform = 'scale(1.25)';
@@ -876,7 +919,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ดึงประวัติการเดินทางจริงจากตาราง journeys
 async function loadHistoryData() {
   const container = document.getElementById('history-list-container');
   if (!container || !supabaseClient || !currentUser) return;
@@ -974,7 +1016,6 @@ function switchLeaderboardTab(type) {
   loadLeaderboardData(type);
 }
 
-// ตัวแปรเก็บ Layer Group สำหรับร้านค้าและบอสบนแผนที่
 let sponsorNodesLayerGroup = null;
 
 async function loadSponsorNodesOnMap() {
