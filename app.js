@@ -208,6 +208,7 @@ function expandBottomSheet() {
 function initBottomSheetGestures() {
   const panel = document.getElementById('bottomPanel');
   const handle = document.getElementById('dragHandle');
+  const detailsContainer = panel ? panel.querySelector('.expanded-details') : null;
   if (!panel) return;
 
   if (handle) {
@@ -216,6 +217,7 @@ function initBottomSheetGestures() {
 
   let touchStartY = 0;
   let touchEndY = 0;
+
   panel.addEventListener('touchstart', (e) => {
     if (e.changedTouches && e.changedTouches.length > 0) {
       touchStartY = e.changedTouches[0].screenY;
@@ -226,11 +228,19 @@ function initBottomSheetGestures() {
     if (e.changedTouches && e.changedTouches.length > 0) {
       touchEndY = e.changedTouches[0].screenY;
       const diff = touchStartY - touchEndY;
-      if (Math.abs(diff) < 20) return;
-      if (diff > 30 && !isSheetExpanded) {
+      if (Math.abs(diff) < 25) return;
+
+      // ถ้าแผงขยายอยู่ และผู้ใช้พยายามปัดลง
+      if (isSheetExpanded && diff < -30) {
+        // อนุญาตให้ปิดแผงได้ก็ต่อเมื่อแตะลากที่แฮนด์ดึง หรือเนื้อหาด้านในเลื่อนขึ้นไปอยู่ที่จุดบนสุด (scrollTop === 0) แล้วเท่านั้น
+        const isTouchingHandle = handle && handle.contains(e.target);
+        const isAtTop = detailsContainer ? detailsContainer.scrollTop === 0 : true;
+
+        if (isTouchingHandle || isAtTop) {
+          applyBottomSheetState(false);
+        }
+      } else if (!isSheetExpanded && diff > 30) {
         applyBottomSheetState(true);
-      } else if (diff < -30 && isSheetExpanded) {
-        applyBottomSheetState(false);
       }
     }
   }, { passive: true });

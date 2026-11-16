@@ -1,5 +1,5 @@
 // ==========================================
-// 📸 photoModule.js — Stride Photo Studio (Full Option)
+// 📸 photoModule.js — Stride Photo Studio (Portrait Edition)
 // ==========================================
 
 let currentStudioData = {
@@ -17,9 +17,6 @@ let currentStudioData = {
 
 let studioBgImageObj = null;
 
-/**
- * รวบรวมข้อมูลล่าสุดจากหน้าแอปมาเตรียมไว้สำหรับ Studio
- */
 function collectLiveActivityData() {
     const distText = document.getElementById('detail-distance')?.textContent?.replace(' กม.', '') || '0.00';
     const timeText = document.getElementById('detail-time')?.textContent || '00:00';
@@ -43,26 +40,19 @@ function collectLiveActivityData() {
     };
 }
 
-/**
- * เปิด Studio หลังจบกิจกรรม (จาก Summary Modal)
- */
 function openShareModal() {
-    closeTopLayer('summary-modal');
+    if (typeof closeTopLayer === 'function') closeTopLayer('summary-modal');
     collectLiveActivityData();
     studioBgImageObj = null;
     resetStudioBackground();
 
-    // แสดงปุ่มบันทึกลง Supabase เพราะเป็นกิจกรรมที่เพิ่งวิ่งเสร็จ
     const saveDbBtn = document.getElementById('btn-studio-save-db');
     if (saveDbBtn) saveDbBtn.style.display = 'block';
 
     renderStudioPreview();
-    openTopLayer('share-modal', 'flex');
+    if (typeof openTopLayer === 'function') openTopLayer('share-modal', 'flex');
 }
 
-/**
- * เปิด Studio ย้อนหลังจากหน้าประวัติ (History)
- */
 function openHistoryShareModal(journeyItem) {
     if (!journeyItem) return;
 
@@ -95,21 +85,17 @@ function openHistoryShareModal(journeyItem) {
     studioBgImageObj = null;
     resetStudioBackground();
 
-    // ซ่อนปุ่มบันทึกลงฐานข้อมูล เพราะรายการนี้ถูกบันทึกไปแล้วในประวัติ
     const saveDbBtn = document.getElementById('btn-studio-save-db');
     if (saveDbBtn) saveDbBtn.style.display = 'none';
 
     renderStudioPreview();
-    openTopLayer('share-modal', 'flex');
+    if (typeof openTopLayer === 'function') openTopLayer('share-modal', 'flex');
 }
 
 function closeShareModal() {
-    closeTopLayer('share-modal');
+    if (typeof closeTopLayer === 'function') closeTopLayer('share-modal');
 }
 
-/**
- * โหลดรูปภาพพื้นหลังที่ผู้ใช้เลือกเข้าสู่พรีวิวและเตรียมวาด Canvas
- */
 function handleStudioPhotoUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -123,7 +109,7 @@ function handleStudioPhotoUpload(event) {
             if (previewBox) {
                 previewBox.style.backgroundImage = `url('${e.target.result}')`;
             }
-            if (typeof showToast === 'function') showToast('🖼️ อัปโหลดรูปพื้นหลังเรียบร้อย!');
+            if (typeof showToast === 'function') showToast('🖼️ โหลดรูปภาพพื้นหลังเรียบร้อย!');
         };
         img.src = e.target.result;
     };
@@ -138,9 +124,6 @@ function resetStudioBackground() {
     }
 }
 
-/**
- * อัปเดตหน้าตาการ์ดพรีวิวตาม Checkbox ที่ผู้ใช้ติ๊กเลือก
- */
 function renderStudioPreview() {
     const brandBadge = document.getElementById('preview-brand-badge');
     const showLogo = document.getElementById('toggle-brand-logo')?.checked ?? true;
@@ -174,23 +157,19 @@ function renderStudioPreview() {
         return `
       <div>
         <div style="opacity:0.75; font-size:10px;">${item.label}</div>
-        <div style="font-weight:800; font-size:13px; color:#ffffff;">${item.value}</div>
+        <div style="font-weight:800; font-size:12px; color:#ffffff;">${item.value}</div>
       </div>
     `;
     }).join('');
 }
 
-/**
- * สร้างภาพความละเอียดสูงด้วย HTML5 Canvas (1080x1350 อัตราส่วน 4:5 สำหรับโซเชียล)
- */
 function generateStudioCanvasBlob() {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
         canvas.width = 1080;
-        canvas.height = 1350;
+        canvas.height = 1350; // อัตราส่วนแนวตั้ง 4:5
         const ctx = canvas.getContext('2d');
 
-        // 1. วาดพื้นหลัง (รูปถ่าย หรือ พื้นหลังธีมเข้ม)
         if (studioBgImageObj) {
             const imgRatio = studioBgImageObj.width / studioBgImageObj.height;
             const canvasRatio = canvas.width / canvas.height;
@@ -212,15 +191,13 @@ function generateStudioCanvasBlob() {
             ctx.fillRect(0, 0, 1080, 1350);
         }
 
-        // 2. วาดเงา Gradient ทับด้านบนและด้านล่างให้อ่านตัวหนังสือชัดเจน
         const overlayGrad = ctx.createLinearGradient(0, 0, 0, 1350);
-        overlayGrad.addColorStop(0, 'rgba(0,0,0,0.55)');
-        overlayGrad.addColorStop(0.45, 'rgba(0,0,0,0.15)');
-        overlayGrad.addColorStop(1, 'rgba(0,0,0,0.88)');
+        overlayGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
+        overlayGrad.addColorStop(0.4, 'rgba(0,0,0,0.1)');
+        overlayGrad.addColorStop(1, 'rgba(0,0,0,0.85)');
         ctx.fillStyle = overlayGrad;
         ctx.fillRect(0, 0, 1080, 1350);
 
-        // 3. วาดโลโก้แบรนด์ STRIDE ด้านบนซ้าย (ถ้าติ๊กเปิดไว้)
         const showLogo = document.getElementById('toggle-brand-logo')?.checked ?? true;
         if (showLogo) {
             ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
@@ -236,28 +213,27 @@ function generateStudioCanvasBlob() {
             ctx.fillText('🏃 STRIDE', 105, 116);
         }
 
-        // วาดวันที่ด้านบนขวา
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.font = '600 32px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(currentStudioData.date, 1010, 115);
         ctx.textAlign = 'left';
 
-        // 4. วาดชื่อกิจกรรมและระยะทางหลัก
-        ctx.fillStyle = '#e2e8f0';
-        ctx.font = 'bold 40px sans-serif';
-        ctx.fillText(currentStudioData.title, 70, 880);
+        // ตรงกลางภาพแนวตั้ง
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 42px sans-serif';
+        ctx.fillText(currentStudioData.title, 70, 600);
 
         ctx.fillStyle = '#22c55e';
-        ctx.font = '900 120px sans-serif';
-        ctx.fillText(`${currentStudioData.distance} กม.`, 70, 1005);
+        ctx.font = '900 140px sans-serif';
+        ctx.fillText(`${currentStudioData.distance} กม.`, 70, 740);
 
-        // 5. วาดเส้นคั่นและตารางสถิติที่เลือก
+        // เส้นคั่น
         ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(70, 1050);
-        ctx.lineTo(1010, 1050);
+        ctx.moveTo(70, 820);
+        ctx.lineTo(1010, 820);
         ctx.stroke();
 
         const statDefinitions = {
@@ -277,33 +253,30 @@ function generateStudioCanvasBlob() {
             const col = index % 3;
             const row = Math.floor(index / 3);
             const x = 70 + (col * 320);
-            const y = 1115 + (row * 105);
+            const y = 900 + (row * 120);
 
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.font = '600 26px sans-serif';
+            ctx.font = '600 28px sans-serif';
             ctx.fillText(item.label, x, y);
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 40px sans-serif';
-            ctx.fillText(item.value, x, y + 46);
+            ctx.font = 'bold 44px sans-serif';
+            ctx.fillText(item.value, x, y + 52);
         });
 
         canvas.toBlob((blob) => resolve(blob), 'image/png', 0.95);
     });
 }
 
-/**
- * ดาวน์โหลดไฟล์รูปภาพ .png ลงเครื่อง
- */
 async function downloadStudioImage() {
-    if (typeof showToast === 'function') showToast('🎨 กำลังสร้างไฟล์ภาพความละเอียดสูง...');
+    if (typeof showToast === 'function') showToast('🎨 กำลังสร้างไฟล์ภาพแนวตั้งความละเอียดสูง...');
     const blob = await generateStudioCanvasBlob();
     if (!blob) return;
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Stride-Activity-${Date.now()}.png`;
+    a.download = `Stride-Portrait-${Date.now()}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -312,9 +285,6 @@ async function downloadStudioImage() {
     if (typeof showToast === 'function') showToast('✅ บันทึกรูปภาพลงเครื่องเรียบร้อย!');
 }
 
-/**
- * แชร์ไฟล์รูปภาพตรงเข้าโซเชียลผ่าน Web Share API (รองรับมือถือ)
- */
 async function shareStudioImageNative() {
     const blob = await generateStudioCanvasBlob();
     if (!blob) return;
@@ -325,49 +295,13 @@ async function shareStudioImageNative() {
         try {
             await navigator.share({
                 title: 'Stride Activity',
-                text: `บันทึกการวิ่ง ${currentStudioData.distance} กม. บน Stride! 🏃🔥`,
+                text: `ผลงานวิ่ง ${currentStudioData.distance} กม. บน Stride! 🏃🔥`,
                 files: [file]
             });
         } catch (err) {
             if (err.name !== 'AbortError') downloadStudioImage();
         }
     } else {
-        // หากเปิดบน PC ที่ไม่รองรับการแชร์ไฟล์ตรง ให้ดาวน์โหลดลงเครื่องแทน
         downloadStudioImage();
     }
-}
-
-// ฟังก์ชันเดิมสำหรับปุ่มกล้องทางลัดบนหน้าแผนที่
-function openCameraShortcutModal() {
-    collectLiveActivityData();
-    const distEl = document.getElementById('cam-stat-dist');
-    const stepsEl = document.getElementById('cam-stat-steps');
-    const dateEl = document.getElementById('cam-live-date');
-
-    if (distEl) distEl.textContent = `${currentStudioData.distance} กม.`;
-    if (stepsEl) stepsEl.textContent = `${currentStudioData.steps} ก้าว | ${currentStudioData.calories} kcal`;
-    if (dateEl) dateEl.textContent = currentStudioData.date;
-
-    openTopLayer('camera-modal', 'flex');
-}
-
-function closeCameraShortcutModal() {
-    closeTopLayer('camera-modal');
-}
-
-function handleCameraPhotoSelected(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        const previewBox = document.getElementById('camera-preview-box');
-        if (previewBox) {
-            previewBox.style.backgroundImage = `url('${e.target.result}')`;
-            previewBox.style.backgroundSize = 'cover';
-            previewBox.style.backgroundPosition = 'center';
-        }
-        if (typeof showToast === 'function') showToast('📸 โหลดรูปภาพสำเร็จ!');
-    };
-    reader.readAsDataURL(file);
 }

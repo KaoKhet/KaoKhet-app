@@ -678,71 +678,79 @@
     </div>
   </div>
 
-  <!-- 📸 Modal Studio แต่งภาพและแชร์สถิติ Full Option -->
+  <!-- 📸 Modal Studio แต่งภาพและแชร์สถิติ Full Option (แนวตั้ง Portrait) -->
   <div id="share-modal"
-    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:3500; align-items:center; justify-content:center; padding:14px; backdrop-filter:blur(4px);">
+    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:3500; align-items:center; justify-content:center; padding:12px; backdrop-filter:blur(4px);">
     <div
-      style="background:#fff; border-radius:24px; padding:18px; max-width:380px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 45px rgba(0,0,0,0.35);">
+      style="background:#fff; border-radius:24px; padding:16px; max-width:380px; width:100%; max-height:95vh; overflow-y:auto; box-shadow:0 20px 45px rgba(0,0,0,0.35);">
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
         <h3 style="font-size:17px; font-weight:800; color:#1f2937; margin:0;">🎨 Stride Photo Studio</h3>
         <button type="button" onclick="closeShareModal()"
           style="background:#f3f4f6; border:none; width:28px; height:28px; border-radius:50%; font-size:15px; font-weight:bold; cursor:pointer;">✕</button>
       </div>
 
-      <!-- พื้นที่พรีวิวภาพที่จะ Export -->
+      <!-- พื้นที่พรีวิวภาพแนวตั้ง (Portrait 4:5) -->
       <div id="share-preview-box"
-        style="position:relative; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:18px; padding:18px; margin-bottom:12px; min-height:240px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; background-size:cover; background-position:center; box-shadow:0 8px 20px rgba(0,0,0,0.2);">
+        style="position:relative; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:18px; padding:16px; margin-bottom:10px; width:100%; aspect-ratio:4/5; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; background-size:cover; background-position:center; box-shadow:0 8px 20px rgba(0,0,0,0.2);">
 
-        <!-- เลเยอร์เงาไล่ระดับให้อ่านตัวหนังสือชัดบนรูปถ่าย -->
+        <!-- เลเยอร์เงาไล่ระดับ -->
         <div
-          style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.55) 100%); pointer-events:none;">
+          style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.5) 100%); pointer-events:none;">
         </div>
 
-        <!-- ส่วนหัว: โลโก้แบรนด์ Stride & วันที่ -->
+        <!-- ส่วนบน: โลโก้แบรนด์ Stride & วันที่ -->
         <div style="position:relative; z-index:1; display:flex; justify-content:space-between; align-items:center;">
           <div id="preview-brand-badge"
-            style="display:flex; align-items:center; gap:6px; background:rgba(34,197,94,0.2); border:1px solid rgba(34,197,94,0.5); padding:4px 10px; border-radius:20px; font-size:11px; font-weight:800; color:#4ade80;">
+            style="display:flex; align-items:center; gap:6px; background:rgba(34,197,94,0.25); border:1px solid rgba(34,197,94,0.6); padding:4px 10px; border-radius:20px; font-size:11px; font-weight:800; color:#4ade80;">
             <span>🏃</span><span>STRIDE</span>
           </div>
-          <span id="preview-date-text" style="font-size:11px; opacity:0.85; font-weight:600;">วันนี้</span>
+          <span id="preview-date-text" style="font-size:11px; opacity:0.9; font-weight:600;">วันนี้</span>
         </div>
 
-        <!-- ส่วนกลาง: ชื่อกิจกรรม -->
-        <div style="position:relative; z-index:1; margin:16px 0 8px 0;">
-          <div id="preview-activity-title" style="font-size:13px; font-weight:700; color:#e2e8f0; margin-bottom:4px;">🏃
+        <!-- ส่วนกลาง: ชื่อกิจกรรม & ระยะทางตัวใหญ่ -->
+        <div style="position:relative; z-index:1; margin:auto 0;">
+          <div id="preview-activity-title" style="font-size:12px; font-weight:700; color:#cbd5e1; margin-bottom:2px;">🏃
             วิ่งออกกำลังกายทั่วไป</div>
           <div id="preview-main-dist"
-            style="font-size:32px; font-weight:900; color:#22c55e; line-height:1.1; letter-spacing:-0.5px;">0.00 กม.
+            style="font-size:38px; font-weight:900; color:#22c55e; line-height:1.1; letter-spacing:-0.5px;">0.00 กม.
           </div>
         </div>
 
-        <!-- ส่วนล่าง: ตารางสถิติที่เลือกเปิดแสดง -->
+        <!-- ส่วนล่าง: ตารางสถิติ -->
         <div id="preview-stats-grid"
-          style="position:relative; z-index:1; display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; border-top:1px solid rgba(255,255,255,0.2); padding-top:10px; font-size:11px;">
-          <!-- เติมค่าอัตโนมัติจาก photoModule.js -->
+          style="position:relative; z-index:1; display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; border-top:1px solid rgba(255,255,255,0.2); padding-top:8px; font-size:11px;">
+          <!-- เรนเดอร์อัตโนมัติ -->
         </div>
       </div>
 
-      <!-- ปุ่มเลือกรูปพื้นหลัง -->
-      <input type="file" id="studio-photo-input" accept="image/*" style="display:none;"
+      <!-- ปุ่มเลือกรูปถ่าย / ถ่ายสด / รีเซ็ต -->
+      <input type="file" id="studio-camera-input" accept="image/*" capture="environment" style="display:none;"
         onchange="handleStudioPhotoUpload(event)" />
-      <div style="display:flex; gap:8px; margin-bottom:12px;">
-        <button type="button" onclick="document.getElementById('studio-photo-input').click()"
-          style="flex:1; padding:9px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
-          🖼️ เลือกรูปถ่ายพื้นหลัง
+      <input type="file" id="studio-gallery-input" accept="image/*" style="display:none;"
+        onchange="handleStudioPhotoUpload(event)" />
+
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <button type="button" onclick="document.getElementById('studio-camera-input').click()"
+          style="flex:1; padding:9px 6px; background:#2563eb; color:white; border:none; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer;">
+          📷 ถ่ายรูปสด
+        </button>
+        <button type="button" onclick="document.getElementById('studio-gallery-input').click()"
+          style="flex:1; padding:9px 6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer;">
+          🖼️ เลือกจากคลัง
         </button>
         <button type="button" onclick="resetStudioBackground()"
-          style="padding:9px 12px; background:#f3f4f6; color:#4b5563; border:none; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer;">
-          รีเซ็ตพื้นหลัง
+          style="padding:9px 8px; background:#f3f4f6; color:#4b5563; border:none; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">
+          รีเซ็ต
         </button>
       </div>
 
-      <!-- แผงติ๊กเลือกเปิด/ปิดข้อมูลสถิติ (Customize Stats) -->
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px; margin-bottom:14px;">
-        <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:8px;">🎛️
+      <!-- แผงติ๊กเลือกเปิด/ปิดข้อมูลสถิติ -->
+      <div
+        style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px; margin-bottom:12px;">
+        <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:6px;">🎛️
           เลือกข้อมูลที่ต้องการแสดงบนภาพ:</div>
-        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; font-size:12px; color:#1e293b;">
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:4px; font-size:11.5px; color:#1e293b;">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
             <input type="checkbox" class="studio-stat-toggle" value="time" checked onchange="renderStudioPreview()"> ⏱️
             เวลาที่ใช้
@@ -774,19 +782,19 @@
       </div>
 
       <!-- ปุ่ม Action ด้านล่าง -->
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        <div style="display:flex; gap:8px;">
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; gap:6px;">
           <button type="button" onclick="downloadStudioImage()"
-            style="flex:1; padding:11px; background:#0f172a; color:white; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">
+            style="flex:1; padding:10px; background:#0f172a; color:white; border:none; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
             💾 บันทึกรูปลงเครื่อง
           </button>
           <button type="button" onclick="shareStudioImageNative()"
-            style="flex:1; padding:11px; background:#3b82f6; color:white; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">
+            style="flex:1; padding:10px; background:#3b82f6; color:white; border:none; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
             📤 แชร์รูปภาพ
           </button>
         </div>
         <button type="button" id="btn-studio-save-db" onclick="finishActivity()"
-          style="width:100%; padding:12px; background:#22c55e; color:white; border:none; border-radius:12px; font-size:14px; font-weight:800; cursor:pointer;">
+          style="width:100%; padding:11px; background:#22c55e; color:white; border:none; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">
           ✅ บันทึกกิจกรรมลงระบบ & เสร็จสิ้น
         </button>
       </div>
