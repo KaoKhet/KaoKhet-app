@@ -761,99 +761,237 @@ async function loadCapturedTerritories() {
   } catch (err) { console.error(err); }
 }
 
-// 📋 จัดการเปิด Modal สรุปกิจกรรมผ่านระบบเลเยอร์กลาง
+// 📋 1. กด Stop: แค่หยุดเวลาและเปิด Summary Modal (ยังไม่ INSERT ลง DB)
 function stopTracking() {
   isTracking = false;
   clearInterval(timerInterval);
   if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
 
   const startBtn = document.getElementById('start-btn');
-  startBtn.textContent = 'STRIDE';
-  startBtn.classList.remove('tracking');
+  if (startBtn) {
+    startBtn.textContent = 'STRIDE';
+    startBtn.classList.remove('tracking');
+  }
 
   const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-  document.getElementById('modal-steps').textContent = steps;
-  document.getElementById('modal-distance').textContent = totalDistance.toFixed(2) + ' กม.';
-  document.getElementById('modal-time').textContent = formatTime(elapsed);
+  const distKm = (typeof totalDistance !== 'undefined' ? totalDistance : 0).toFixed(2);
+  const paceStr = (typeof currentPace !== 'undefined' ? currentPace : '—');
+  const stepsVal = (typeof steps !== 'undefined' ? steps : 0);
+  const calVal = Math.round(stepsVal * 0.04);
+  const cadenceVal = (typeof cadence !== 'undefined' ? cadence : 0);
+  const heartVal = (typeof avgHeartRate !== 'undefined' ? avgHeartRate : 125);
 
-  openTopLayer('summary-modal', 'flex');
+  const elDist = document.getElementById('summary-distance');
+  if (elDist) elDist.textContent = `${distKm} กม.`;
+
+  const elTime = document.getElementById('summary-time');
+  if (elTime) elTime.textContent = formatTime ? formatTime(elapsed) : `${Math.floor(elapsed / 60)}:${elapsed % 60}`;
+
+  const elPace = document.getElementById('summary-pace');
+  if (elPace) elPace.textContent = `${paceStr} /กม.`;
+
+  const elSteps = document.getElementById('summary-steps');
+  if (elSteps) elSteps.textContent = stepsVal.toLocaleString();
+
+  const elCal = document.getElementById('summary-calories');
+  if (elCal) elCal.textContent = `${calVal} kcal`;
+
+  const elCadence = document.getElementById('summary-cadence');
+  if (elCadence) elCadence.textContent = `${cadenceVal} spm`;
+
+  const elHeart = document.getElementById('summary-heart');
+  if (elHeart) elHeart.textContent = `${heartVal} bpm`;
+
+  if (typeof openTopLayer === 'function') {
+    openTopLayer('summary-modal', 'flex');
+  }
 }
 
+// 🗑️ ปุ่มรีเซ็ตทิ้งเริ่มต้นใหม่ (ล้างข้อมูลทั้งหมด ไม่บันทึก)
 function resetModal() {
   closeTopLayer('summary-modal');
-  totalDistance = 0; steps = 0; startTime = null; startTimeISO = null;
-  lastPosition = null; startingPoint = null; pathCoordinates = []; isCapturedSuccess = false;
-  if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+  closeTopLayer('share-modal');
+  totalDistance = 0;
+  steps = 0;
+  startTime = null;
+  startTimeISO = null;
+  lastPosition = null;
+  startingPoint = null;
+  pathCoordinates = [];
+  isCapturedSuccess = false;
+
+  if (routePolyline) {
+    map.removeLayer(routePolyline);
+    routePolyline = null;
+  }
   updateStats();
+  showToast('🗑️ รีเซ็ตข้อมูลเรียบร้อย');
 }
 
+// ▶️ ปุ่มไปต่อ (Resume): วิ่งต่อจากเดิม ไม่บันทึกและไม่ลบข้อมูล
 function resumeTracking() {
   closeTopLayer('summary-modal');
   isTracking = true;
+  startTime = startTime || Date.now();
   timerInterval = setInterval(updateStats, 1000);
+
   const startBtn = document.getElementById('start-btn');
-  startBtn.textContent = 'STOP';
-  startBtn.classList.add('tracking');
+  if (startBtn) {
+    startBtn.textContent = 'STOP';
+    startBtn.classList.add('tracking');
+  }
+
+  // เปิดใช้งาน GPS Watch ต่อเนื่อง
+  if (navigator.geolocation && watchId === null) {
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => { processNewCoordinate(pos.coords.latitude, pos.coords.longitude); },
+      (err) => console.log('GPS error:', err.message),
+      { enableHighAccuracy: true, maximumAge: 1000, distanceFilter: 1 }
+    );
+  }
+  showToast('▶️ ดำเนินกิจกรรมต่อ...');
 }
 
-async function finishActivity() {
-  if (typeof closeShareModal === 'function') {
-    closeShareModal();
-  } else {
-    closeTopLayer('share-modal');
-  }
+// 💾 บันทึกข้อมูลลง Supabase เมื่อกดปุ่มจาก Summary Modal (พร้อม Debug Log)
+async function executeDatabaseInsert() {
+  console.log("🚀 [DEBUG] เริ่มต้นกระบวนการบันทึกข้อมูลลง Supabase...");
 
   if (!supabaseClient || !currentUser) {
-    alert('⚠️ กรุณาล็อกอินเข้าระบบก่อนบันทึกข้อมูล');
-    resetModal();
-    return;
+    console.warn("⚠️ [DEBUG] ไม่พบ Supabase Client หรือ User ที่ล็อกอิน");
+    showToast('⚠️ กรุณาล็อกอินก่อนบันทึกข้อมูล');
+    return false;
   }
 
-  const endedAtISO = new Date().toISOString();
+  // ดึงค่าสถิติปัจจุบันให้แน่ใจว่าเป็นตัวเลขที่ถูกต้อง
+  const currentDistKm = typeof totalDistance !== 'undefined' ? Number(totalDistance) || 0 : 0;
+  const distanceInMeters = Math.round(currentDistKm * 1000);
+  const stepsVal = typeof steps !== 'undefined' ? Number(steps) || 0 : 0;
+  const calories = Math.round(stepsVal * 0.04);
   const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-  const distanceInMeters = Math.round(totalDistance * 1000);
-  const calories = Math.round(steps * 0.04);
 
-  // คำนวณค่าสถิติเชิงลึก (Deep Stats) สำหรับบันทึกฐานข้อมูล
-  let paceStr = '0:00';
-  if (totalDistance > 0.01 && elapsed > 0) {
-    const paceTotalSec = elapsed / totalDistance;
+  console.log("📊 [DEBUG] สถิติที่จะบันทึก:", { currentDistKm, distanceInMeters, stepsVal, calories, elapsed });
+
+  let paceDbStr = '0:00';
+  if (currentDistKm > 0.01 && elapsed > 0) {
+    const paceTotalSec = elapsed / currentDistKm;
     const paceMin = Math.floor(paceTotalSec / 60);
     const paceSec = Math.floor(paceTotalSec % 60).toString().padStart(2, '0');
-    paceStr = `${paceMin}:${paceSec}`;
+    paceDbStr = `${paceMin}:${paceSec}`;
   }
-  const cadenceVal = elapsed > 0 ? Math.round((steps / elapsed) * 60) : 0;
+  const cadenceVal = elapsed > 0 ? Math.round((stepsVal / elapsed) * 60) : 0;
 
-  // Payload ข้อมูลทั้งหมดที่จะส่งเข้าตาราง journeys ใน Supabase
+  const endedAtISO = new Date().toISOString();
   const tripData = {
     user_id: currentUser.id,
     started_at: startTimeISO || endedAtISO,
     ended_at: endedAtISO,
     distance_meters: distanceInMeters,
-    steps: steps,
+    steps: stepsVal,
     calories: calories,
-    pace: paceStr,
+    pace: paceDbStr,
     cadence: cadenceVal,
-    elevation_gain: 0,       // รองรับข้อมูลความสูงสะสม
-    avg_heart_rate: 125,     // ค่าเฉลี่ยชีพจร (หรือค่าจำลองมาตรฐาน)
-    path_coordinates: pathCoordinates,
-    is_captured: isCapturedSuccess,
-    activity_title: isCapturedSuccess ? 'วิ่งยึดพื้นที่สำเร็จ 👑' : 'วิ่งออกกำลังกายทั่วไป 🏃'
+    elevation_gain: 0,
+    avg_heart_rate: 125,
+    path_coordinates: typeof pathCoordinates !== 'undefined' ? [...pathCoordinates] : [],
+    is_captured: typeof isCapturedSuccess !== 'undefined' ? isCapturedSuccess : false,
+    activity_title: (typeof isCapturedSuccess !== 'undefined' && isCapturedSuccess)
+      ? 'วิ่งยึดพื้นที่สำเร็จ 👑'
+      : 'วิ่งออกกำลังกายทั่วไป 🏃'
   };
 
+  console.log("📦 [DEBUG] Payload ที่ส่งเข้าตาราง journeys:", tripData);
+
   try {
-    const { error } = await supabaseClient.from('journeys').insert([tripData]);
+    const { data, error } = await supabaseClient
+      .from('journeys')
+      .insert([tripData])
+      .select();
+
     if (error) {
+      console.error('❌ [DEBUG] Supabase insert error:', error);
       showToast('❌ บันทึกไม่สำเร็จ: ' + error.message);
-    } else {
-      await addPlayerXP(Math.floor(totalDistance * 50));
-      showToast('✅ บันทึกสถิติเชิงลึกเข้า Supabase สำเร็จ!');
+      return false;
     }
-    loadCapturedTerritories();
+
+    console.log('✅ [DEBUG] บันทึกสำเร็จ ได้รับข้อมูลตอบกลับ:', data);
+    showToast('✅ บันทึกข้อมูลเรียบร้อย! กำลังเปิดหน้าแต่งรูป...');
+
+    if (typeof addPlayerXP === 'function') {
+      await addPlayerXP(Math.floor(currentDistKm * 50));
+    }
+    if (typeof loadCapturedTerritories === 'function') {
+      loadCapturedTerritories();
+    }
+    return true;
   } catch (err) {
+    console.error('❌ [DEBUG] Unexpected insert error:', err);
     showToast('❌ เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    return false;
   }
-  resetModal();
+}
+
+// 📸 กดปุ่มบันทึกจาก Summary Modal: บันทึกลง DB สำเร็จ -> เปิด Studio -> รีเซ็ตหน้าจอหลักเบื้องหลัง
+async function openShareModal() {
+  console.log("📸 [DEBUG] ผู้ใช้กดบันทึกจาก Summary Modal");
+
+  // 1. ปิดหน้า Summary Modal ก่อน
+  if (typeof closeTopLayer === 'function') {
+    closeTopLayer('summary-modal');
+  }
+
+  // 2. สั่งบันทึกลง Supabase
+  const success = await executeDatabaseInsert();
+  if (!success) {
+    console.warn("⚠️ [DEBUG] การบันทึกไม่สำเร็จ ยกเลิกการเปิด Studio");
+    return;
+  }
+
+  // 3. ถ้าบันทึกสำเร็จ เปิดหน้า Stride Photo Studio ต่อ
+  if (typeof openStudioModal === 'function') {
+    openStudioModal();
+  }
+}
+
+// ✖️ ปิดหน้าต่าง Studio และเคลียร์ค่าพร้อมวิ่งรอบใหม่
+function finishActivity() {
+  console.log("✨ [DEBUG] ปิดหน้า Studio และรีเซ็ตค่าสถานะระบบ");
+
+  // 1. ปิดหน้าต่าง Studio
+  if (typeof closeTopLayer === 'function') {
+    closeTopLayer('share-modal');
+  }
+
+  // 2. สั่งรีเซ็ตค่าทางเดินและสถิติหน้าจอหลักให้กลับเป็น 0 ทันที
+  if (typeof resetModal === 'function') {
+    resetModal();
+  }
+
+  showToast('✨ เสร็จสิ้นกระบวนการ พร้อมลุยรอบใหม่!');
+}
+
+function openSummaryModal() {
+  // ดึงค่าสถิติล่าสุดจากจอหลักหรือตัวแปรสถานะ
+  const distText = document.getElementById('detail-distance')?.textContent || '0.00 กม.';
+  const timeText = document.getElementById('detail-time')?.textContent || '00:00';
+  const paceText = document.getElementById('detail-pace')?.textContent || '— /กม.';
+  const stepsText = document.getElementById('detail-steps')?.textContent || '0';
+  const calText = document.getElementById('detail-cal')?.textContent || '0 kcal';
+  const cadenceText = document.getElementById('detail-cadence')?.textContent || '0 spm';
+  const heartText = document.getElementById('detail-heart')?.textContent || '125 bpm';
+
+  // นำไปใส่ใน Element ของ Summary Modal
+  document.getElementById('summary-distance').textContent = distText;
+  document.getElementById('summary-time').textContent = timeText;
+  document.getElementById('summary-pace').textContent = paceText;
+  document.getElementById('summary-steps').textContent = stepsText;
+  document.getElementById('summary-calories').textContent = calText;
+  document.getElementById('summary-cadence').textContent = cadenceText;
+  document.getElementById('summary-heart').textContent = heartText;
+
+  // เปิด Modal สรุปผล
+  if (typeof openTopLayer === 'function') {
+    openTopLayer('summary-modal', 'flex');
+  }
 }
 
 // ==========================================
