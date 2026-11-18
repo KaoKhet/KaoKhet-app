@@ -24,6 +24,7 @@ let studioState = {
     selectedStats: ['time', 'pace', 'steps', 'calories'],
     showRoute: true,
     showLogo: true,
+    showDate: true,
 
     // ตำแหน่งและการย่อขยายของชิ้นส่วนอิสระ (Custom Widgets)
     customWidgets: {
@@ -265,6 +266,7 @@ function toggleStudioStatChip(btnElement) {
 function toggleStudioExtraChip(type) {
     if (type === 'route') studioState.showRoute = !studioState.showRoute;
     if (type === 'logo') studioState.showLogo = !studioState.showLogo;
+    if (type === 'date') studioState.showDate = !studioState.showDate;
     syncStudioChipsUI();
     renderStudioPreview();
 }
@@ -351,17 +353,30 @@ function buildRouteSVGMarkup(widthPx = 90, heightPx = 90) {
     });
 
     const span = Math.max(maxLat - minLat || 0.00001, maxLng - minLng || 0.00001);
-    const pointsStr = coords.map(pt => {
+
+    // แปลงพิกัดเป็นจุดพิกเซล X, Y
+    const mappedPoints = coords.map(pt => {
         const lat = Array.isArray(pt) ? pt[0] : pt.lat;
         const lng = Array.isArray(pt) ? pt[1] : pt.lng;
-        const x = 12 + ((lng - minLng) / span) * 76;
-        const y = 12 + ((maxLat - lat) / span) * 76;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
+        const x = 15 + ((lng - minLng) / span) * 70;
+        const y = 15 + ((maxLat - lat) / span) * 70;
+        return { x, y };
+    });
+
+    const pointsStr = mappedPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const startPt = mappedPoints[0];
+    const endPt = mappedPoints[mappedPoints.length - 1];
 
     return `
-    <svg viewBox="0 0 100 100" style="width:${widthPx}px; height:${heightPx}px; overflow:visible; filter:drop-shadow(0 0 6px rgba(34,197,94,0.85));">
+    <svg viewBox="0 0 100 100" style="width:${widthPx}px; height:${heightPx}px; overflow:visible; filter:drop-shadow(0 0 8px rgba(34,197,94,0.75));">
+      <!-- เส้นทางวิ่ง -->
       <polyline points="${pointsStr}" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+      
+      <!-- หมุดจุดเริ่มต้น (Start - วงกลมสีเขียวสว่าง) -->
+      <circle cx="${startPt.x}" cy="${startPt.y}" r="4.5" fill="#4ade80" stroke="#fff" stroke-width="1.5" />
+      
+      <!-- หมุดจุดสิ้นสุด (End - วงกลมขอบขาวด้านในเขียวเข้ม หรือธง) -->
+      <circle cx="${endPt.x}" cy="${endPt.y}" r="4.5" fill="#16a34a" stroke="#fff" stroke-width="1.5" />
     </svg>
   `;
 }
@@ -395,7 +410,9 @@ function renderTemplateClassicBottom() {
       <div class="custom-widget-box" data-widget-key="brand" style="pointer-events:auto; cursor:grab;">
         ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 STRIDE</div>` : ''}
       </div>
-      <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab; font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>
+      <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab;">
+        ${studioState.showDate ? `<div style="font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>` : ''}
+      </div>
       <div class="custom-widget-box" data-widget-key="route" style="pointer-events:auto; cursor:grab;">${studioState.showRoute ? buildRouteSVGMarkup(76, 76) : ''}</div>
     </div>
     <div class="custom-widget-box" data-widget-key="stats" style="margin-top:auto; pointer-events:auto; cursor:grab;">
@@ -416,7 +433,9 @@ function renderTemplateStravaCenter() {
       <div class="custom-widget-box" data-widget-key="brand" style="pointer-events:auto; cursor:grab;">
         ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 STRIDE</div>` : ''}
       </div>
-      <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab; font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>
+      <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab;">
+        ${studioState.showDate ? `<div style="font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>` : ''}
+      </div>
     </div>
     <div class="custom-widget-box" data-widget-key="distance" style="margin:auto 0; text-align:center; display:flex; flex-direction:column; align-items:center; pointer-events:auto; cursor:grab;">
       <div style="margin-bottom:8px;" class="custom-widget-box" data-widget-key="route">${studioState.showRoute ? buildRouteSVGMarkup(105, 105) : ''}</div>
@@ -441,7 +460,9 @@ function renderTemplateSplitFrame() {
       <div class="custom-widget-box" data-widget-key="brand" style="pointer-events:auto; cursor:grab;">
         ${studioState.showLogo ? `<span style="background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:2px 8px; border-radius:14px; font-size:9.5px; font-weight:800; color:#4ade80;">🏃 STRIDE</span>` : '<span></span>'}
       </div>
-      <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab; font-size:10.5px; color:rgba(255,255,255,0.85); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>
+      <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab;">
+        ${studioState.showDate ? `<div style="font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>` : ''}
+      </div>
     </div>
     <div class="custom-widget-box" data-widget-key="distance" style="pointer-events:auto; cursor:grab;">
       <div style="font-size:32px; font-weight:900; color:#22c55e; line-height:1.1;">${currentStudioData.distance} กม.</div>
@@ -467,7 +488,9 @@ function renderTemplateGlassCard() {
       <div class="custom-widget-box" data-widget-key="brand" style="pointer-events:auto; cursor:grab;">
         ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 STRIDE</div>` : '<div></div>'}
       </div>
-      <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab; font-size:10.5px; color:rgba(255,255,255,0.85); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>
+      <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab;">
+        ${studioState.showDate ? `<div style="font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>` : ''}
+      </div>
     </div>
     <div class="custom-widget-box" data-widget-key="stats" style="margin-top:auto; width:84%; background:rgba(15,23,42,0.65); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.22); border-radius:18px; padding:14px; pointer-events:auto; cursor:grab;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
