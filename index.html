@@ -11,6 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/dist/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 
 <body>
@@ -774,21 +775,59 @@
           style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.55) 100%); pointer-events:none; z-index:1;">
         </div>
 
-        <!-- แถบเครื่องมือลอยด้านบน (Floating Top Bar: ปิด, กล้องสด, คลังภาพ, รีเซ็ต) -->
+        <!-- แถบเครื่องมือลอยด้านบน (Top Action Bar: ปิด, บันทึก, แชร์, ถ่ายสด, คลังภาพ, รีเซ็ต) -->
         <div
           style="position:relative; z-index:10; display:flex; justify-content:space-between; align-items:center; padding:14px 16px;">
           <button type="button" onclick="finishActivity()"
             style="width:36px; height:36px; border-radius:50%; background:rgba(15,23,42,0.65); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.15); color:white; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
 
-          <div style="display:flex; gap:8px;">
-            <button type="button" onclick="document.getElementById('studio-camera-input').click()" title="ถ่ายรูปสด"
-              style="padding:7px 12px; border-radius:20px; background:rgba(37,99,235,0.85); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.2); color:white; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
-              <span>📷</span><span>ถ่ายสด</span>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <!-- 💾 1. ปุ่มบันทึก -->
+            <button type="button" onclick="downloadStudioImage()" title="บันทึกรูป"
+              style="display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; background:rgba(255,255,255,0.12); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.2); color:#fff; cursor:pointer; font-size:12px; font-weight:600;">
+              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17,21 17,13 7,13 7,21"></polyline>
+                <polyline points="7,3 7,8 15,8"></polyline>
+              </svg>
             </button>
-            <button type="button" onclick="document.getElementById('studio-gallery-input').click()" title="เลือกจากคลัง"
-              style="padding:7px 12px; border-radius:20px; background:rgba(15,23,42,0.65); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.2); color:white; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
-              <span>🖼️</span><span>คลังภาพ</span>
+
+            <!-- 📷 2. ปุ่มกล้อง -->
+            <button type="button" onclick="document.getElementById('studio-camera-input').click()" title="ถ่ายภาพ"
+              style="display:flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:rgba(37,99,235,0.85); border:1px solid rgba(255,255,255,0.2); color:#fff; cursor:pointer;font-size:12px; font-weight:600;">
+              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
             </button>
+
+            <!-- ↗️ 3. ปุ่มแชร์ -->
+            <button type="button" onclick="shareStudioImageNative()" title="แชร์โซเชียล"
+              style="display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; background:rgba(59,130,246,0.85); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.2); color:#fff; cursor:pointer;">
+              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+            </button>
+
+            <!-- 🖼️ 4. ปุ่มเลือกรูปจากคลัง -->
+            <button type="button" onclick="document.getElementById('studio-gallery-input').click()"
+              title="เลือกรูปภาพพื้นหลัง"
+              style="display:flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:rgba(15,23,42,0.65); border:1px solid rgba(255,255,255,0.2); color:#fff; cursor:pointer;">
+              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21,15 16,10 5,21"></polyline>
+              </svg>
+            </button>
+
             <button type="button" onclick="resetStudioBackground()" title="รีเซ็ตพื้นหลัง"
               style="width:34px; height:34px; border-radius:50%; background:rgba(15,23,42,0.65); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.2); color:#cbd5e1; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↺</button>
           </div>
@@ -809,38 +848,32 @@
     <input type="file" id="studio-gallery-input" accept="image/*" style="display:none;"
       onchange="handleStudioPhotoUpload(event)" />
 
-    <!-- แถบเครื่องมือลอยด้านล่าง (Floating Bottom Control Dock) -->
-    <div
-      style="background:rgba(15,23,42,0.95); backdrop-filter:blur(16px); border-top:1px solid rgba(255,255,255,0.12); padding:12px 16px 18px 16px; color:white; z-index:20;">
-
-      <!-- 1. แถบเลือก Layout Templates 4 รูปแบบ (เลื่อนแนวนอนได้) -->
+    <!-- 📐 แผงควบคุมหลัก (แสดงเลย์เอาต์และปุ่มเลือกสถิติทั้งหมดที่ผู้ใช้ปรับแต่ง) -->
+    <div id="studio-preset-controls">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
         <span style="font-size:11px; font-weight:700; color:#94a3b8;">📐 เลย์เอาต์ (Templates)</span>
         <span id="studio-quota-indicator" style="font-size:11px; font-weight:700; color:#4ade80;">สถิติ: 4/4</span>
       </div>
 
+      <!-- แถบเลือกเลย์เอาต์ -->
       <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; scrollbar-width:none;">
         <button type="button" class="studio-layout-chip active" data-layout="classic"
           onclick="selectStudioLayout('classic')"
-          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1.5px solid #22c55e; background:rgba(34,197,94,0.2); color:#4ade80; font-size:11.5px; font-weight:700; cursor:pointer;">
-          1. Classic ล่าง
-        </button>
+          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1.5px solid #22c55e; background:rgba(34,197,94,0.2); color:#4ade80; font-size:11.5px; font-weight:700; cursor:pointer;">1.
+          Classic ล่าง</button>
         <button type="button" class="studio-layout-chip" data-layout="center" onclick="selectStudioLayout('center')"
-          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">
-          2. Strava กลางภาพ
-        </button>
+          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">2.
+          Strava กลางภาพ</button>
         <button type="button" class="studio-layout-chip" data-layout="split" onclick="selectStudioLayout('split')"
-          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">
-          3. แยกบน-ล่าง
-        </button>
+          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">3.
+          แยกบน-ล่าง</button>
         <button type="button" class="studio-layout-chip" data-layout="glass" onclick="selectStudioLayout('glass')"
-          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">
-          4. การ์ดกระจกมุมซ้าย
-        </button>
+          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">4.
+          การ์ดกระจกมุมซ้าย</button>
       </div>
 
-      <!-- 2. แถบปุ่มแคปซูลเปิด/ปิดข้อมูล (เลือกสถิติได้สูงสุด 4 ค่า + เส้นทาง + โลโก้) -->
-      <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:10px; scrollbar-width:none;">
+      <!-- แถบเลือกสถิติย่อยครบชุด (เวลา, เพซ, ก้าว, แคลอรี, รอบขา, ชีพจร, เส้นทาง, โลโก้) -->
+      <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none;">
         <button type="button" class="studio-stat-chip active" data-stat="time" onclick="toggleStudioStatChip(this)"
           style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #38bdf8; background:rgba(56,189,248,0.2); color:#7dd3fc; font-size:11px; font-weight:600; cursor:pointer;">⏱️
           เวลา</button>
@@ -859,35 +892,40 @@
         <button type="button" class="studio-stat-chip" data-stat="heart" onclick="toggleStudioStatChip(this)"
           style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#94a3b8; font-size:11px; font-weight:600; cursor:pointer;">❤️
           ชีพจร</button>
-
-        <!-- ปุ่มเปิด/ปิดเส้นทางวิ่ง (+1 Route) -->
         <button type="button" id="chip-toggle-route" class="active" onclick="toggleStudioExtraChip('route')"
           style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #22c55e; background:rgba(34,197,94,0.2); color:#4ade80; font-size:11px; font-weight:700; cursor:pointer;">🗺️
           เส้นทาง</button>
-
-        <!-- ปุ่มเปิด/ปิดโลโก้แบรนด์ -->
         <button type="button" id="chip-toggle-logo" class="active" onclick="toggleStudioExtraChip('logo')"
           style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #a855f7; background:rgba(168,85,247,0.2); color:#d8b4fe; font-size:11px; font-weight:700; cursor:pointer;">🏷️
           โลโก้</button>
       </div>
-
-      <!-- 3. แถบปุ่ม Action หลัก -->
-      <div style="display:flex; gap:8px;">
-        <button type="button" onclick="downloadStudioImage()"
-          style="flex:1; padding:11px 8px; background:rgba(255,255,255,0.12); color:white; border:1px solid rgba(255,255,255,0.15); border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">
-          💾 บันทึกรูป
-        </button>
-        <button type="button" onclick="shareStudioImageNative()"
-          style="flex:1; padding:11px 8px; background:#3b82f6; color:white; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">
-          📤 แชร์โซเชียล
-        </button>
-        <button type="button" id="btn-studio-save-db" onclick="finishActivity()"
-          style="flex:1.3; padding:11px 8px; background:#22c55e; color:#052e16; border:none; border-radius:12px; font-size:12px; font-weight:800; cursor:pointer;">
-          ปิดหน้าต่าง / เสร็จสิ้น
-        </button>
-      </div>
-
     </div>
+
+    <!-- 🧩 แผงควบคุม Custom Modular Widgets (แสดงเมื่อเลือกโหมด Custom) -->
+    <div id="studio-custom-controls" style="display: none; padding-bottom: 6px;">
+      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 6px;">เลือกเปิด/ปิดชิ้นส่วน
+        (แตะลากหรือซูมบนจอภาพได้):</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+        <button type="button" id="toggle-widget-brand" onclick="toggleCustomWidgetVisibility('brand')"
+          style="padding:5px 10px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">🏷️ โลโก้ &
+          วันที่</button>
+        <button type="button" id="toggle-widget-distance" onclick="toggleCustomWidgetVisibility('distance')"
+          style="padding:5px 10px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">📏 ระยะทาง &
+          ชื่อ</button>
+        <button type="button" id="toggle-widget-route" onclick="toggleCustomWidgetVisibility('route')"
+          style="padding:5px 10px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">🗺️
+          เส้นทางวิ่ง</button>
+        <button type="button" id="toggle-widget-stats" onclick="toggleCustomWidgetVisibility('stats')"
+          style="padding:5px 10px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">📊
+          กล่องสถิติ</button>
+      </div>
+      <button type="button" onclick="resetCustomWidgetsTransform()"
+        style="width:100%; padding:6px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#e2e8f0; font-size:11px; font-weight:600; cursor:pointer;">
+        🔄 รีเซ็ตตำแหน่งกล่องทั้งหมด
+      </button>
+    </div>
+
+  </div>
   </div>
 
   <!-- 🗑️ Modal ยืนยันการลบคูปอง -->
