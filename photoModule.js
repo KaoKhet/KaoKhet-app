@@ -1,5 +1,5 @@
 // ============================================================================
-// 📸 photoModule.js — Stride Photo Studio (Direct Modular Customization)
+// 📸 photoModule.js — KaoKhet Photo Studio (Direct Modular Customization)
 // ============================================================================
 
 const MAX_STUDIO_STATS = 4;
@@ -408,7 +408,7 @@ function renderTemplateClassicBottom() {
     return `
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:4px;">
       <div class="custom-widget-box" data-widget-key="brand" style="pointer-events:auto; cursor:grab;">
-        ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 STRIDE</div>` : ''}
+        ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 KAOKHET</div>` : ''}
       </div>
       <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab;">
         ${studioState.showDate ? `<div style="font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>` : ''}
@@ -431,7 +431,7 @@ function renderTemplateStravaCenter() {
     return `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
       <div class="custom-widget-box" data-widget-key="brand" style="pointer-events:auto; cursor:grab;">
-        ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 STRIDE</div>` : ''}
+        ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 KAOKHET</div>` : ''}
       </div>
       <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab;">
         ${studioState.showDate ? `<div style="font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>` : ''}
@@ -458,7 +458,7 @@ function renderTemplateSplitFrame() {
     return `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
       <div class="custom-widget-box" data-widget-key="brand" style="pointer-events:auto; cursor:grab;">
-        ${studioState.showLogo ? `<span style="background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:2px 8px; border-radius:14px; font-size:9.5px; font-weight:800; color:#4ade80;">🏃 STRIDE</span>` : '<span></span>'}
+        ${studioState.showLogo ? `<span style="background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:2px 8px; border-radius:14px; font-size:9.5px; font-weight:800; color:#4ade80;">🏃 KAOKHET</span>` : '<span></span>'}
       </div>
       <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab;">
         ${studioState.showDate ? `<div style="font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>` : ''}
@@ -486,7 +486,7 @@ function renderTemplateGlassCard() {
     return `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
       <div class="custom-widget-box" data-widget-key="brand" style="pointer-events:auto; cursor:grab;">
-        ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 STRIDE</div>` : '<div></div>'}
+        ${studioState.showLogo ? `<div style="display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,0.25); border:1px solid #22c55e; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; color:#4ade80;">🏃 KAOKHET</div>` : '<div></div>'}
       </div>
       <div class="custom-widget-box" data-widget-key="date" style="pointer-events:auto; cursor:grab;">
         ${studioState.showDate ? `<div style="font-size:11px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:10px;">${currentStudioData.date}</div>` : ''}
@@ -580,7 +580,7 @@ function drawCanvasBrandHeader(ctx, align = 'left') {
     const x = align === 'center' ? 390 : 80;
     ctx.fillStyle = 'rgba(34, 197, 94, 0.25)'; ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.roundRect(x, 85, 300, 76, 38); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#4ade80'; ctx.font = 'bold 38px sans-serif'; ctx.fillText('🏃 STRIDE', x + 42, 136);
+    ctx.fillStyle = '#4ade80'; ctx.font = 'bold 38px sans-serif'; ctx.fillText('🏃 KAOKHET', x + 42, 136);
     if (align !== 'center') {
         ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = '600 34px sans-serif'; ctx.textAlign = 'right';
         ctx.fillText(currentStudioData.date, 1000, 134); ctx.textAlign = 'left';
@@ -595,7 +595,7 @@ async function downloadStudioImage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Stride-Custom-${Date.now()}.png`;
+    a.download = `KaoKhet-Custom-${Date.now()}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -607,11 +607,11 @@ async function downloadStudioImage() {
 async function shareStudioImageNative() {
     const blob = await generateStudioCanvasBlob();
     if (!blob) return;
-    const file = new File([blob], `Stride-Run-${Date.now()}.png`, { type: 'image/png' });
+    const file = new File([blob], `KaoKhet-Run-${Date.now()}.png`, { type: 'image/png' });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ title: 'Stride Activity', text: `บันทึกการวิ่ง ${currentStudioData.distance} กม. บน Stride! 🏃🔥`, files: [file] });
+            await navigator.share({ title: 'KaoKhet Activity', text: `บันทึกการวิ่ง ${currentStudioData.distance} กม. บน KaoKhet! 🏃🔥`, files: [file] });
         } catch (err) {
             if (err.name !== 'AbortError') downloadStudioImage();
         }

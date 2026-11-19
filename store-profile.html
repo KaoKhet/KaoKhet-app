@@ -165,7 +165,7 @@
                 claimInserted = true;
 
                 // 4. สร้างรหัสและบันทึกลงตาราง user_coupons เพื่อให้ loadMyCoupons ดึงไปแสดงในกระเป๋า
-                const couponCode = 'STRIDE-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                const couponCode = 'KAOKHET-' + Math.random().toString(36).substring(2, 8).toUpperCase();
                 const { error: couponErr } = await supabaseClient
                     .from('user_coupons')
                     .insert([{

@@ -15,10 +15,10 @@ function useCoupon(couponId, couponCode, couponTitle, couponDetailsText = '') {
   const qrEl = document.getElementById('modal-coupon-qr');
   const detailsEl = document.getElementById('modal-coupon-details');
 
-  if (titleEl) titleEl.innerText = couponTitle || 'คูปองส่วนลด Stride';
-  if (codeEl) codeEl.innerText = couponCode || 'STRIDE-COUPON';
+  if (titleEl) titleEl.innerText = couponTitle || 'คูปองส่วนลด KaoKhet';
+  if (codeEl) codeEl.innerText = couponCode || 'KAOKHET-COUPON';
   if (qrEl) {
-    qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(couponCode || 'STRIDE')}`;
+    qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(couponCode || 'KAOKHET')}`;
   }
   if (detailsEl) {
     detailsEl.innerHTML = couponDetailsText || 'กดปุ่ม "ปิดหน้าต่าง" เพื่อกลับไปยังกระเป๋าคูปอง';
@@ -244,7 +244,7 @@ async function loadMyCoupons(targetUserId = null) {
         day: 'numeric'
       });
 
-      const couponCode = uc.coupon_code || ('STRIDE-' + uc.id.substring(0, 6).toUpperCase());
+      const couponCode = uc.coupon_code || ('KAOKHET-' + uc.id.substring(0, 6).toUpperCase());
       const isRedeemed = uc.is_redeemed === true;
       const cardClass = isRedeemed ? 'coupon-card redeemed' : 'coupon-card';
 

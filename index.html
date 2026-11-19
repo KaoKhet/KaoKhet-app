@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Stride — เดินเพื่อพื้นที่ของเรา (Camera Pro Edition)</title>
+  <title>KaoKhet — เดินเพื่อพื้นที่ของเรา (Camera Pro Edition)</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -23,7 +23,7 @@
     <div class="auth-card">
       <div style="text-align:center; margin-bottom:20px;">
         <div style="font-size:36px; margin-bottom:6px;">🏃</div>
-        <h1 style="font-size:24px; font-weight:800; color:#22c55e;">Stride</h1>
+        <h1 style="font-size:24px; font-weight:800; color:#22c55e;">KaoKhet</h1>
         <p style="font-size:12px; color:#6b7280; margin-top:4px;">เดินเพื่อพื้นที่ของเรา & สงครามแคลน</p>
       </div>
       <form id="auth-form" onsubmit="handleAuthLogin(event)">
@@ -60,7 +60,7 @@
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:16px;">🎵</span>
-          <span style="font-size:11px; font-weight:700; color:#10b981; text-transform:uppercase;">Stride Music
+          <span style="font-size:11px; font-weight:700; color:#10b981; text-transform:uppercase;">KaoKhet Music
             Player</span>
         </div>
         <div style="display:flex; gap:6px;">
@@ -180,7 +180,7 @@
 
         <div class="controls-row">
           <button type="button" id="music-btn" class="icon-btn" onclick="openMusicWidget()" title="เพลง">🎵</button>
-          <button type="button" id="start-btn" class="main-action-btn">STRIDE</button>
+          <button type="button" id="start-btn" class="main-action-btn">KAOKHET</button>
           <button type="button" id="camera-btn" class="icon-btn" onclick="openCameraShortcutModal()"
             title="ถ่ายภาพ & แนบสถิติ">📸</button>
         </div>
@@ -328,7 +328,7 @@
 
       <!-- แถวกรอกรหัสและปุ่มตรวจสอบ -->
       <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-        <input type="text" id="merchant-coupon-input" placeholder="เช่น STRIDE-XXXXXX"
+        <input type="text" id="merchant-coupon-input" placeholder="เช่น KAOKHET-XXXXXX"
           style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #444; background: #2a2a3e; color: #fff; font-size: 13px;" />
         <button onclick="handleMerchantRedeemClick()"
           style="background: #4f46e5; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
@@ -380,7 +380,7 @@
         <div>
           <div
             style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85; font-weight: 600;">
-            แต้มสะสมของคุณ (Stride Balance)</div>
+            แต้มสะสมของคุณ (KaoKhet Balance)</div>
           <div id="sponsor-user-points"
             style="font-size: 28px; font-weight: 800; margin-top: 4px; letter-spacing: -0.5px;">0 Points</div>
           <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">🎁 แลกรับส่วนลดและของรางวัลพิเศษได้ที่นี่
@@ -461,7 +461,7 @@
       <div style="display:flex; align-items:center; gap:12px;">
         <div style="font-size:24px;">🪙</div>
         <div>
-          <div style="font-size:11px; color:#6b7280;">แต้มสะสม Stride Points</div>
+          <div style="font-size:11px; color:#6b7280;">แต้มสะสม KaoKhet Points</div>
           <div id="user-points-val" style="font-size:18px; font-weight:700; color:#1f2937;">250 Points</div>
         </div>
       </div>
@@ -683,8 +683,8 @@
     <div
       style="background:#ffffff; color:#111827; border-radius:20px; padding:20px; width:100%; max-width:340px; text-align:center; box-shadow:0 12px 32px rgba(0,0,0,0.35);">
       <div style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:#168039; margin-bottom:4px;">
-        STRIDE PRIVILEGE COUPON</div>
-      <h3 id="modal-coupon-title" style="font-size:16px; font-weight:700; margin-bottom:12px;">คูปองส่วนลด Stride
+        KAOKHET PRIVILEGE COUPON</div>
+      <h3 id="modal-coupon-title" style="font-size:16px; font-weight:700; margin-bottom:12px;">คูปองส่วนลด KaoKhet
       </h3>
 
       <img id="modal-coupon-qr" src="" alt="QR Code"
@@ -693,7 +693,7 @@
       <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">ยื่นให้พนักงานสแกนหรือกรอกรหัสนี้</div>
       <div id="modal-coupon-code"
         style="font-size:16px; font-weight:800; color:#ea580c; font-family:monospace; letter-spacing:0.05em; margin-bottom:10px;">
-        STRIDE-COUPON</div>
+        KAOKHET-COUPON</div>
 
       <div id="modal-coupon-details"
         style="font-size:12px; color:#374151; background:#f9fafb; border-radius:10px; padding:8px 10px; margin-bottom:14px; text-align:left; line-height:1.45;">
@@ -728,21 +728,21 @@
   <div id="camera-modal"
     style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); z-index:2800; align-items:center; justify-content:center; padding:15px;">
     <div style="background:#fff; border-radius:24px; padding:20px; max-width:340px; width:100%; text-align:center;">
-      <h3 style="font-size:18px; margin-bottom:10px; color:#1f2937;">📸 ถ่ายภาพสถิติ Stride</h3>
+      <h3 style="font-size:18px; margin-bottom:10px; color:#1f2937;">📸 ถ่ายภาพสถิติ KaoKhet</h3>
       <div style="font-size:11px; color:#6b7280; margin-bottom:12px;">เลือกภาพจากกล้องหรืออัปโหลดเพื่อแนบสถิติวิ่ง
       </div>
 
       <div id="camera-preview-box"
         style="background:linear-gradient(135deg, #111 0%, #1f2937 100%); color:white; border-radius:16px; padding:18px; margin-bottom:14px; min-height:200px; display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden; border:2px solid #22c55e;">
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; opacity:0.9;">
-          <span>🟢 Stride Territory Game</span>
+          <span>🟢 KaoKhet Territory Game</span>
           <span id="cam-live-date">วันนี้</span>
         </div>
         <div style="margin:20px 0;">
           <div id="cam-stat-dist" style="font-size:22px; font-weight:800; color:#22c55e;">0.00 กม.</div>
           <div id="cam-stat-steps" style="font-size:13px; opacity:0.9; margin-top:2px;">0 ก้าวเดิน | 0 แคลอรี</div>
         </div>
-        <div style="font-size:10px; opacity:0.7; letter-spacing:1px;">#WALKFOROURSPACE #STRIDE</div>
+        <div style="font-size:10px; opacity:0.7; letter-spacing:1px;">#WALKFOROURSPACE #KAOKHET</div>
       </div>
 
       <input type="file" id="camera-file-input" accept="image/*" capture="environment" style="display:none;"
@@ -758,7 +758,7 @@
     </div>
   </div>
 
-  <!-- 📸 Full-Screen Stride Photo Studio (Floating Toolbar + 4 Modular Templates) -->
+  <!-- 📸 Full-Screen KaoKhet Photo Studio (Floating Toolbar + 4 Modular Templates) -->
   <div id="share-modal"
     style="display:none; position:fixed; inset:0; background:#090d16; z-index:4000; flex-direction:column; justify-content:space-between; overflow:hidden; font-family:sans-serif;">
 

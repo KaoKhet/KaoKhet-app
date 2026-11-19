@@ -453,7 +453,7 @@ function updateWidgetUI() {
 }
 
 // ==========================================
-// 🗺️ ระบบแผนที่และการติดตาม (Stride Tracking)
+// 🗺️ ระบบแผนที่และการติดตาม (KaoKhet Tracking)
 // ==========================================
 let map;
 let isTracking = false;
@@ -769,7 +769,7 @@ function stopTracking() {
 
   const startBtn = document.getElementById('start-btn');
   if (startBtn) {
-    startBtn.textContent = 'STRIDE';
+    startBtn.textContent = 'KAOKHET';
     startBtn.classList.remove('tracking');
   }
 
@@ -946,7 +946,7 @@ async function openShareModal() {
     return;
   }
 
-  // 3. ถ้าบันทึกสำเร็จ เปิดหน้า Stride Photo Studio ต่อ
+  // 3. ถ้าบันทึกสำเร็จ เปิดหน้า KaoKhet Photo Studio ต่อ
   if (typeof openStudioModal === 'function') {
     openStudioModal();
   }
@@ -1150,7 +1150,7 @@ async function loadSponsorNodesOnMap() {
           lat: camp.lat,
           lng: camp.lng,
           storeId: camp.sponsor_id || camp.created_by || '',
-          merchantName: camp.merchant_name || 'Stride Partner',
+          merchantName: camp.merchant_name || 'KaoKhet Partner',
           items: []
         };
       }
@@ -1255,11 +1255,11 @@ async function loadSponsorNodesOnMap() {
 // ==========================================
 // 📱 Safe Initialization & Event Binding
 // ==========================================
-let _strideAppInitialized = false;
+let _KaoKhetAppInitialized = false;
 
-function initStrideApp() {
-  if (_strideAppInitialized) return;
-  _strideAppInitialized = true;
+function initKaoKhetApp() {
+  if (_KaoKhetAppInitialized) return;
+  _KaoKhetAppInitialized = true;
 
   initMusicSystem();
   initBottomSheetGestures();
@@ -1317,7 +1317,7 @@ function initStrideApp() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initStrideApp);
+  document.addEventListener('DOMContentLoaded', initKaoKhetApp);
 } else {
-  initStrideApp();
+  initKaoKhetApp();
 }
