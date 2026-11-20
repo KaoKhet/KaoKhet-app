@@ -22,8 +22,8 @@
   <div id="screen-auth" class="page active">
     <div class="auth-card">
       <div style="text-align:center; margin-bottom:20px;">
-        <div style="font-size:36px; margin-bottom:6px;">🏃</div>
-        <h1 style="font-size:24px; font-weight:800; color:#22c55e;">KaoKhet</h1>
+        <img src="kaokhetlogo0.png" alt="KaoKhet"
+          style="height:64px; width:auto; object-fit:contain; margin:0 auto 6px; display:block;" />
         <p style="font-size:12px; color:#6b7280; margin-top:4px;">เดินเพื่อพื้นที่ของเรา & สงครามแคลน</p>
       </div>
       <form id="auth-form" onsubmit="handleAuthLogin(event)">
@@ -758,179 +758,239 @@
     </div>
   </div>
 
-  <!-- 📸 Full-Screen KaoKhet Photo Studio (Floating Toolbar + 4 Modular Templates) -->
-  <div id="share-modal"
-    style="display:none; position:fixed; inset:0; background:#090d16; z-index:4000; flex-direction:column; justify-content:space-between; overflow:hidden; font-family:sans-serif;">
+  <!-- 📸 Full-Screen KaoKhet Studio (Top Bar + 2-Step Bottom Toolbar + Watermark) -->
+  <div id="share-modal" class="kk-studio-active"
+    style="display:none; position:fixed; inset:0; z-index:4000; flex-direction:column; justify-content:space-between; overflow:hidden;">
 
-    <!-- พื้นที่แคนวาสพรีวิวเต็มจอ (Full-Screen Canvas Area) -->
-    <div
-      style="position:relative; flex:1; display:flex; align-items:center; justify-content:center; padding:12px; overflow:hidden;">
-
-      <!-- กรอบจำลองภาพสัดส่วน 9:16 -->
-      <div id="share-preview-box"
-        style="position:relative; width:100%; height:100%; max-width:420px; aspect-ratio:9/16; background:linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border-radius:24px; overflow:hidden; background-size:cover; background-position:center; box-shadow:0 20px 50px rgba(0,0,0,0.65); display:flex; flex-direction:column; justify-content:space-between;">
-
-        <!-- เลเยอร์เงาไล่ระดับให้อ่านตัวหนังสือชัดเจนบนทุกพื้นหลัง -->
-        <div id="preview-gradient-overlay"
-          style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.55) 100%); pointer-events:none; z-index:1;">
+    <!-- 1. TOP BAR: ปุ่มเครื่องมืออยู่นอกกรอบรูปทั้งหมด -->
+    <header class="kk-studio-topbar">
+      <div class="kk-studio-top-left">
+        <button type="button" class="kk-studio-btn" onclick="finishActivity()" title="ปิดสตูดิโอ">✕</button>
+        <div class="kk-studio-brand-title">
+          <strong>KaoKhet Studio</strong>
+          <span>แต่งภาพสถิติ & แชร์</span>
         </div>
-
-        <!-- แถบเครื่องมือลอยด้านบน (Top Action Bar: ปิด, บันทึก, แชร์, ถ่ายสด, คลังภาพ, รีเซ็ต) -->
-        <div
-          style="position:relative; z-index:10; display:flex; justify-content:space-between; align-items:center; padding:14px 16px;">
-          <button type="button" onclick="finishActivity()"
-            style="width:36px; height:36px; border-radius:50%; background:rgba(15,23,42,0.65); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.15); color:white; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
-
-          <div style="display:flex; gap:8px; align-items:center;">
-            <!-- 🖼️ 1. ปุ่มเลือกรูปจากคลัง -->
-            <button type="button" onclick="document.getElementById('studio-gallery-input').click()"
-              title="เลือกรูปภาพพื้นหลัง"
-              style="display:flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:rgba(15,23,42,0.65); border:1px solid rgba(255,255,255,0.2); color:#fff; cursor:pointer;">
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21,15 16,10 5,21"></polyline>
-              </svg>
-            </button>
-
-            <!-- 📷 2. ปุ่มกล้อง -->
-            <button type="button" onclick="document.getElementById('studio-camera-input').click()" title="ถ่ายภาพ"
-              style="display:flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:rgba(37,99,235,0.85); border:1px solid rgba(255,255,255,0.2); color:#fff; cursor:pointer;font-size:12px; font-weight:600;">
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-              </svg>
-            </button>
-
-            <!-- ↗️ 3. ปุ่มแชร์ -->
-            <button type="button" onclick="shareStudioImageNative()" title="แชร์โซเชียล"
-              style="display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; background:rgba(59,130,246,0.85); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.2); color:#fff; cursor:pointer;">
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
-                <circle cx="18" cy="5" r="3"></circle>
-                <circle cx="6" cy="12" r="3"></circle>
-                <circle cx="18" cy="19" r="3"></circle>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-              </svg>
-            </button>
-
-            <!-- 💾 4. ปุ่มบันทึก -->
-            <button type="button" onclick="downloadStudioImage()" title="บันทึกรูป"
-              style="display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; background:rgba(255,255,255,0.12); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.2); color:#fff; cursor:pointer; font-size:12px; font-weight:600;">
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                <polyline points="17,21 17,13 7,13 7,21"></polyline>
-                <polyline points="7,3 7,8 15,8"></polyline>
-              </svg>
-            </button>
-
-            <button type="button" onclick="resetStudioBackground()" title="รีเซ็ตพื้นหลัง"
-              style="width:34px; height:34px; border-radius:50%; background:rgba(15,23,42,0.65); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.2); color:#cbd5e1; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↺</button>
-          </div>
-        </div>
-
-        <!-- พื้นที่เรนเดอร์เนื้อหาของแต่ละ Template (ปรับเปลี่ยนอิสระตามบล็อกเลย์เอาต์) -->
-        <div id="studio-template-stage"
-          style="position:relative; z-index:5; flex:1; display:flex; flex-direction:column; padding:0 18px 18px 18px; pointer-events:none;">
-          <!-- ถูกสร้างอัตโนมัติจาก photoModule.js ตาม Layout ที่เลือก -->
-        </div>
-
       </div>
-    </div>
 
-    <!-- Input ซ่อนสำหรับกล้องและคลังรูปภาพ -->
+      <div class="kk-studio-btn-group">
+        <!-- 1. คลังภาพ -->
+        <button type="button" class="kk-studio-btn" onclick="document.getElementById('studio-gallery-input').click()"
+          title="เลือกรูปจากแกลเลอรี">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <path
+              d="M20 4H8c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8.5 4.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5zM8.5 15l2.75-3.5 2 2.5 2.75-3.5L19.5 15h-11z" />
+            <path d="M4 8H2v10c0 1.1.9 2 2 2h14v-2H4V8z" />
+          </svg>
+        </button>
+
+        <!-- 2. กล้อง -->
+        <button type="button" class="kk-studio-btn primary kk-btn-camera"
+          onclick="document.getElementById('studio-camera-input').click()" title="ถ่ายภาพ">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path
+              d="M9.4 4L7.8 6H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-2.8l-1.6-2H9.4zM12 16c-1.93 0-3.5-1.57-3.5-3.5S10.07 9 12 9s3.5 1.57 3.5 3.5S13.93 16 12 16z" />
+          </svg>
+        </button>
+
+        <!-- 3. แชร์ (แบบ 3 ก้านตามเดิม) -->
+        <button type="button" class="kk-studio-btn share-btn" onclick="shareStudioImageNative()" title="แชร์รูปภาพ">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+            style="width:16px; height:16px; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none;">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
+
+        <!-- 4. ดาวน์โหลด -->
+        <button type="button" class="kk-studio-btn save-btn kk-btn-download" onclick="downloadStudioImage()"
+          title="ดาวน์โหลดรูปภาพ">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+            <rect x="4" y="16.5" width="16" height="4" rx="2" fill="currentColor" />
+            <circle cx="17" cy="18.5" r="0.9" fill="#0d2618" />
+            <path d="M12 3.5v10.5m0 0l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Hidden File Inputs -->
     <input type="file" id="studio-camera-input" accept="image/*" capture="environment" style="display:none;"
       onchange="handleStudioPhotoUpload(event)" />
     <input type="file" id="studio-gallery-input" accept="image/*" style="display:none;"
       onchange="handleStudioPhotoUpload(event)" />
 
-    <!-- 📐 แผงควบคุมหลัก (แสดงเลย์เอาต์และปุ่มเลือกสถิติทั้งหมดที่ผู้ใช้ปรับแต่ง) -->
-    <div id="studio-preset-controls">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-        <span style="font-size:11px; font-weight:700; color:#94a3b8;">📐 เลย์เอาต์ (Templates)</span>
-        <span id="studio-quota-indicator" style="font-size:11px; font-weight:700; color:#4ade80;">สถิติ: 4/4</span>
+    <!-- 2. WORKSPACE: กรอบพื้นที่แสดงผลจริง -->
+    <main class="kk-studio-workspace">
+      <div id="studio-first-visit-hint" class="kk-studio-first-hint" style="display:none;">
+        ใช้ 2 นิ้วหุบ-ถ่างเพื่อย่อ/ขยายรูปและสถิติ หรือลากย้ายตำแหน่งได้
       </div>
 
-      <!-- แถบเลือกเลย์เอาต์ -->
-      <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; scrollbar-width:none;">
-        <button type="button" class="studio-layout-chip active" data-layout="classic"
-          onclick="selectStudioLayout('classic')"
-          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1.5px solid #22c55e; background:rgba(34,197,94,0.2); color:#4ade80; font-size:11.5px; font-weight:700; cursor:pointer;">1.
-          Classic ล่าง</button>
-        <button type="button" class="studio-layout-chip" data-layout="center" onclick="selectStudioLayout('center')"
-          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">2.
-          Strava กลางภาพ</button>
-        <button type="button" class="studio-layout-chip" data-layout="split" onclick="selectStudioLayout('split')"
-          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">3.
-          แยกบน-ล่าง</button>
-        <button type="button" class="studio-layout-chip" data-layout="glass" onclick="selectStudioLayout('glass')"
-          style="flex-shrink:0; padding:6px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#cbd5e1; font-size:11.5px; font-weight:700; cursor:pointer;">4.
-          การ์ดกระจกมุมซ้าย</button>
+      <div id="share-preview-box" class="kk-studio-canvas">
+        <!-- เลเยอร์ 1: รูปภาพพื้นหลัง (ย่อขยาย 2 นิ้ว + ลากย้าย + ฟิลเตอร์) -->
+        <div id="studio-bg-photo-layer" class="kk-studio-bg-layer">
+          <img id="studio-bg-photo-img" src="" alt="" style="display:none;" />
+        </div>
+
+        <!-- ข้อความแนะนำเมื่อยังไม่ใส่รูปถ่าย -->
+        <div id="studio-empty-photo-hint" class="kk-studio-empty-hint">
+          <div style="font-size:32px; opacity:0.35; margin-bottom:6px;">🖼️</div>
+          <div>แตะปุ่มกล้อง หรือแกลเลอรีด้านบน<br>เพื่อเพิ่มรูปภาพพื้นหลัง (หรือใช้พื้นหลังสีเข้มนี้ได้เลย)</div>
+        </div>
+
+        <!-- เลเยอร์ 2: โลโก้ เส้นทาง สถิติ และสติกเกอร์ -->
+        <div id="studio-template-stage" class="kk-studio-stage"></div>
+
+        <!-- เลเยอร์ 3: ลายน้ำ © ก้าวเขต KaoKhet + วันที่ (พื้นโปร่งใส บังคับแสดงเสมอ) -->
+        <div class="kk-studio-mandatory-footer">
+          <span>&copy; ก้าวเขต KaoKhet</span>
+          <span id="studio-mandatory-date"></span>
+        </div>
+      </div>
+    </main>
+
+    <!-- 3. OPTIONS PANEL: ตัวเลือกย่อย (สเต็ปที่ 2) -->
+    <section class="kk-studio-options-panel">
+      <div class="kk-studio-panel-header">
+        <span id="studio-panel-status-text">เลือกเทมเพลตจัดวางข้อมูล</span>
+        <button type="button" class="kk-studio-reset-btn" onclick="resetStudioPositionAndScale()">↺
+          รีเซ็ตตำแหน่ง/ขนาด</button>
       </div>
 
-      <!-- แถบเลือกสถิติย่อยครบชุด (เวลา, เพซ, ก้าว, แคลอรี, รอบขา, ชีพจร, เส้นทาง, โลโก้) -->
-      <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none;">
-        <button type="button" class="studio-stat-chip active" data-stat="time" onclick="toggleStudioStatChip(this)"
-          style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #38bdf8; background:rgba(56,189,248,0.2); color:#7dd3fc; font-size:11px; font-weight:600; cursor:pointer;">⏱️
-          เวลา</button>
-        <button type="button" class="studio-stat-chip active" data-stat="pace" onclick="toggleStudioStatChip(this)"
-          style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #38bdf8; background:rgba(56,189,248,0.2); color:#7dd3fc; font-size:11px; font-weight:600; cursor:pointer;">⚡
-          เพซ</button>
-        <button type="button" class="studio-stat-chip active" data-stat="steps" onclick="toggleStudioStatChip(this)"
-          style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #38bdf8; background:rgba(56,189,248,0.2); color:#7dd3fc; font-size:11px; font-weight:600; cursor:pointer;">🚶
-          ก้าวเดิน</button>
-        <button type="button" class="studio-stat-chip active" data-stat="calories" onclick="toggleStudioStatChip(this)"
-          style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #38bdf8; background:rgba(56,189,248,0.2); color:#7dd3fc; font-size:11px; font-weight:600; cursor:pointer;">🔥
-          แคลอรี</button>
-        <button type="button" class="studio-stat-chip" data-stat="cadence" onclick="toggleStudioStatChip(this)"
-          style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#94a3b8; font-size:11px; font-weight:600; cursor:pointer;">👟
-          รอบขา</button>
-        <button type="button" class="studio-stat-chip" data-stat="heart" onclick="toggleStudioStatChip(this)"
-          style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#94a3b8; font-size:11px; font-weight:600; cursor:pointer;">❤️
-          ชีพจร</button>
-        <button type="button" id="chip-toggle-date" class="studio-extra-chip active"
-          onclick="toggleStudioExtraChip('date')"
-          style="flex-shrink:0; padding:7px 14px; border-radius:20px; border:1px solid #38bdf8; background:rgba(56,189,248,0.2); color:#7dd3fc; cursor:pointer; font-size:12px; font-weight:600;">
-          วันที่
-        </button>
-        <button type="button" id="chip-toggle-route" class="active" onclick="toggleStudioExtraChip('route')"
-          style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #22c55e; background:rgba(34,197,94,0.2); color:#4ade80; font-size:11px; font-weight:700; cursor:pointer;">🗺️
-          เส้นทาง</button>
-        <button type="button" id="chip-toggle-logo" class="active" onclick="toggleStudioExtraChip('logo')"
-          style="flex-shrink:0; padding:5px 10px; border-radius:12px; border:1px solid #a855f7; background:rgba(168,85,247,0.2); color:#d8b4fe; font-size:11px; font-weight:700; cursor:pointer;">🏷️
-          โลโก้</button>
-      </div>
-    </div>
+      <div class="kk-studio-options-scroll">
+        <!-- หมวด 1: เทมเพลต -->
+        <div class="kk-studio-options-row active" id="panel-templates">
+          <div class="kk-studio-template-card active" data-layout="classic" onclick="selectStudioLayout('classic')">
+            <span>คลาสสิก</span>
+          </div>
+          <div class="kk-studio-template-card" data-layout="center" onclick="selectStudioLayout('center')">
+            <span>กลางภาพ</span>
+          </div>
+          <div class="kk-studio-template-card" data-layout="split" onclick="selectStudioLayout('split')">
+            <span>แยกสัดส่วน</span>
+          </div>
+          <div class="kk-studio-template-card" data-layout="glass" onclick="selectStudioLayout('glass')">
+            <span>การ์ดโปร่งแสง</span>
+          </div>
+        </div>
 
-    <!-- 🧩 แผงควบคุม Custom Modular Widgets (แสดงเมื่อเลือกโหมด Custom) -->
-    <div id="studio-custom-controls" style="display: none; padding-bottom: 6px;">
-      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 6px;">เลือกเปิด/ปิดชิ้นส่วน
-        (แตะลากหรือซูมบนจอภาพได้):</div>
-      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
-        <button type="button" id="toggle-widget-brand" onclick="toggleCustomWidgetVisibility('brand')"
-          style="padding:5px 10px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">🏷️ โลโก้ &
-          วันที่</button>
-        <button type="button" id="toggle-widget-distance" onclick="toggleCustomWidgetVisibility('distance')"
-          style="padding:5px 10px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">📏 ระยะทาง &
-          ชื่อ</button>
-        <button type="button" id="toggle-widget-route" onclick="toggleCustomWidgetVisibility('route')"
-          style="padding:5px 10px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">🗺️
-          เส้นทางวิ่ง</button>
-        <button type="button" id="toggle-widget-stats" onclick="toggleCustomWidgetVisibility('stats')"
-          style="padding:5px 10px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">📊
-          กล่องสถิติ</button>
+        <!-- หมวด 2: โลโก้ เส้นทาง และสถิติ -->
+        <div class="kk-studio-options-row" id="panel-stats">
+          <div class="kk-studio-toggle-chip core-brand-chip active" id="studio-toggle-logo"
+            onclick="toggleStudioExtraChip('logo')">
+            <span>โลโก้ก้าวเขต</span>
+            <div class="kk-check-box">✓</div>
+          </div>
+          <div class="kk-studio-toggle-chip core-brand-chip active" id="studio-toggle-route"
+            onclick="toggleStudioExtraChip('route')">
+            <span>เส้นทางโพลีไลน์</span>
+            <div class="kk-check-box">✓</div>
+          </div>
+
+          <div class="kk-studio-chip-divider"></div>
+
+          <div class="kk-studio-toggle-chip kk-studio-stat-chip active" data-stat="time"
+            onclick="toggleStudioStatChip(this)">
+            <span>เวลาที่ใช้</span>
+            <div class="kk-check-box">✓</div>
+          </div>
+          <div class="kk-studio-toggle-chip kk-studio-stat-chip active" data-stat="pace"
+            onclick="toggleStudioStatChip(this)">
+            <span>เพซเฉลี่ย</span>
+            <div class="kk-check-box">✓</div>
+          </div>
+          <div class="kk-studio-toggle-chip kk-studio-stat-chip active" data-stat="steps"
+            onclick="toggleStudioStatChip(this)">
+            <span>ก้าวเดิน</span>
+            <div class="kk-check-box">✓</div>
+          </div>
+          <div class="kk-studio-toggle-chip kk-studio-stat-chip active" data-stat="calories"
+            onclick="toggleStudioStatChip(this)">
+            <span>แคลอรี</span>
+            <div class="kk-check-box">✓</div>
+          </div>
+          <div class="kk-studio-toggle-chip kk-studio-stat-chip" data-stat="cadence"
+            onclick="toggleStudioStatChip(this)">
+            <span>รอบขา</span>
+            <div class="kk-check-box">✓</div>
+          </div>
+          <div class="kk-studio-toggle-chip kk-studio-stat-chip" data-stat="heart" onclick="toggleStudioStatChip(this)">
+            <span>ชีพจร</span>
+            <div class="kk-check-box">✓</div>
+          </div>
+        </div>
+
+        <!-- หมวด 3: สติกเกอร์ -->
+        <div class="kk-studio-options-row" id="panel-stickers">
+          <div class="kk-studio-sticker-item active" onclick="selectStudioSticker('', this)">🚫</div>
+          <div class="kk-studio-sticker-item" onclick="selectStudioSticker('🏃‍♂️', this)">🏃‍♂️</div>
+          <div class="kk-studio-sticker-item" onclick="selectStudioSticker('🔥', this)">🔥</div>
+          <div class="kk-studio-sticker-item" onclick="selectStudioSticker('👑', this)">👑</div>
+          <div class="kk-studio-sticker-item" onclick="selectStudioSticker('💪', this)">💪</div>
+          <div class="kk-studio-sticker-item" onclick="selectStudioSticker('📍', this)">📍</div>
+          <div class="kk-studio-sticker-item" onclick="selectStudioSticker('⚡', this)">⚡</div>
+          <div class="kk-studio-sticker-item" onclick="selectStudioSticker('🏅', this)">🏅</div>
+        </div>
+
+        <!-- หมวด 4: ฟิลเตอร์ -->
+        <div class="kk-studio-options-row" id="panel-filters">
+          <div class="kk-studio-filter-item active" onclick="selectStudioFilter('none', this)">
+            <div class="kk-studio-filter-dot" style="background: linear-gradient(135deg, #e2e8f0, #94a3b8);"></div>
+            <span>ปกติ (คลีน)</span>
+          </div>
+          <div class="kk-studio-filter-item" onclick="selectStudioFilter('brightness(0.82) contrast(1.06)', this)">
+            <div class="kk-studio-filter-dot" style="background: linear-gradient(135deg, #334155, #0f172a);"></div>
+            <span>ทึบขับตัวเลข</span>
+          </div>
+          <div class="kk-studio-filter-item" onclick="selectStudioFilter('contrast(1.18) saturate(1.15)', this)">
+            <div class="kk-studio-filter-dot" style="background: linear-gradient(135deg, #22c55e, #0284c7);"></div>
+            <span>คมชัดสดใส</span>
+          </div>
+          <div class="kk-studio-filter-item" onclick="selectStudioFilter('brightness(1.08) saturate(1.1)', this)">
+            <div class="kk-studio-filter-dot" style="background: linear-gradient(135deg, #fef08a, #bae6fd);"></div>
+            <span>สว่างใส</span>
+          </div>
+          <div class="kk-studio-filter-item"
+            onclick="selectStudioFilter('sepia(0.24) saturate(1.2) brightness(1.02)', this)">
+            <div class="kk-studio-filter-dot" style="background: linear-gradient(135deg, #fdba74, #b45309);"></div>
+            <span>โทนอบอุ่น</span>
+          </div>
+          <div class="kk-studio-filter-item"
+            onclick="selectStudioFilter('contrast(1.15) saturate(0.85) hue-rotate(-10deg)', this)">
+            <div class="kk-studio-filter-dot" style="background: linear-gradient(135deg, #38bdf8, #1e3a8a);"></div>
+            <span>โทนเย็น</span>
+          </div>
+          <div class="kk-studio-filter-item" onclick="selectStudioFilter('grayscale(1) contrast(1.2)', this)">
+            <div class="kk-studio-filter-dot" style="background: linear-gradient(135deg, #f8fafc, #1e293b);"></div>
+            <span>ขาวดำ</span>
+          </div>
+        </div>
       </div>
-      <button type="button" onclick="resetCustomWidgetsTransform()"
-        style="width:100%; padding:6px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#e2e8f0; font-size:11px; font-weight:600; cursor:pointer;">
-        🔄 รีเซ็ตตำแหน่งกล่องทั้งหมด
+    </section>
+
+    <!-- 4. BOTTOM NAV: แถบหมวดหมู่หลัก (สเต็ปที่ 1) -->
+    <nav class="kk-studio-bottom-nav">
+      <button type="button" class="kk-studio-nav-item active"
+        onclick="selectStudioCategory('panel-templates', 'เลือกเทมเพลตจัดวางข้อมูล', this)">
+        <span>เทมเพลต</span>
       </button>
-    </div>
+      <button type="button" class="kk-studio-nav-item"
+        onclick="selectStudioCategory('panel-stats', 'เปิด/ปิด โลโก้ เส้นทาง และสถิติ (สูงสุด 4 ค่า)', this)">
+        <span>ข้อมูล & โลโก้</span>
+      </button>
+      <button type="button" class="kk-studio-nav-item"
+        onclick="selectStudioCategory('panel-stickers', 'เลือกสติกเกอร์ตกแต่ง (ลากย้ายและย่อขยายได้)', this)">
+        <span>สติกเกอร์</span>
+      </button>
+      <button type="button" class="kk-studio-nav-item"
+        onclick="selectStudioCategory('panel-filters', 'ปรับโทนสีและความสว่างของรูปพื้นหลัง', this)">
+        <span>ฟิลเตอร์</span>
+      </button>
+    </nav>
 
-  </div>
   </div>
 
   <!-- 🗑️ Modal ยืนยันการลบคูปอง -->

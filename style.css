@@ -1150,3 +1150,465 @@ h2 {
 .nav-item.active .nav-label {
   font-weight: 600;
 }
+
+/* ============================================================================
+   📸 KaoKhet Studio (2-Step Bottom Toolbar + Pinch-to-Zoom + Watermark)
+   ============================================================================ */
+#share-modal.kk-studio-active {
+  background: #060911 !important;
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  user-select: none;
+}
+
+.kk-studio-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: rgba(6, 9, 17, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.kk-studio-top-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kk-studio-brand-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.kk-studio-brand-title strong {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #f8fafc;
+}
+
+.kk-studio-brand-title span {
+  font-size: 10px;
+  color: #4ade80;
+}
+
+.kk-studio-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.kk-studio-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.kk-studio-btn:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.kk-studio-btn.primary {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #ffffff;
+  font-size: 15px;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
+}
+
+.kk-studio-btn.share-btn {
+  background: rgba(59, 130, 246, 0.85);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.kk-studio-btn.save-btn {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #4ade80;
+}
+
+.kk-studio-workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  position: relative;
+  background: radial-gradient(circle at center, #111827 0%, #060911 75%);
+  overflow: hidden;
+}
+
+.kk-studio-first-hint {
+  position: absolute;
+  top: 10px;
+  font-size: 11px;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  padding: 4px 12px;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 1;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  white-space: nowrap;
+}
+
+.kk-studio-first-hint.fade-out {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+#share-preview-box.kk-studio-canvas {
+  height: 100%;
+  max-height: 540px;
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 20px 50px rgba(0, 0, 0, 0.75);
+  position: relative;
+  touch-action: none;
+}
+
+.kk-studio-bg-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  cursor: grab;
+  z-index: 1;
+}
+
+.kk-studio-bg-layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  display: block;
+}
+
+.kk-studio-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: #94a3b8;
+  pointer-events: none;
+  z-index: 2;
+  font-size: 12px;
+  opacity: 0.7;
+  line-height: 1.45;
+}
+
+#studio-template-stage.kk-studio-stage {
+  position: relative;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 16px 16px 30px 16px;
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.kk-studio-stage .custom-widget-box {
+  pointer-events: auto;
+  cursor: grab;
+  transform-origin: center center;
+  touch-action: none;
+  position: relative;
+}
+
+.kk-studio-stage .custom-widget-box:active {
+  cursor: grabbing;
+}
+
+.kk-studio-logo-img {
+  height: 30px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+  display: block;
+}
+
+.kk-studio-logo-fallback {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(34, 197, 94, 0.25);
+  border: 1px solid #22c55e;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #4ade80;
+}
+
+.kk-studio-sticker-box {
+  position: absolute;
+  top: 42%;
+  right: 18px;
+  font-size: 38px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  z-index: 8;
+}
+
+.kk-studio-mandatory-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24px;
+  padding: 0 12px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  letter-spacing: 0.2px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.kk-studio-options-panel {
+  background: #0f172a;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 10px 0 8px 0;
+  flex-shrink: 0;
+  z-index: 15;
+}
+
+.kk-studio-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px 8px 16px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.kk-studio-reset-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+  font-size: 10.5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kk-studio-options-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 16px;
+  scrollbar-width: none;
+}
+
+.kk-studio-options-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.kk-studio-options-row {
+  display: none;
+  gap: 10px;
+  padding-bottom: 2px;
+}
+
+.kk-studio-options-row.active {
+  display: flex;
+}
+
+.kk-studio-template-card {
+  flex-shrink: 0;
+  width: 86px;
+  height: 60px;
+  border-radius: 12px;
+  background: #1e293b;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.kk-studio-template-card.active {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.kk-studio-toggle-chip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  background: #1e293b;
+  border-radius: 11px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.kk-studio-toggle-chip .kk-check-box {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1.5px solid #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: transparent;
+}
+
+.kk-studio-toggle-chip.active {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: #22c55e;
+}
+
+.kk-studio-toggle-chip.active .kk-check-box {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #ffffff;
+}
+
+.kk-studio-toggle-chip.core-brand-chip.active {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: #38bdf8;
+}
+
+.kk-studio-toggle-chip.core-brand-chip.active .kk-check-box {
+  background: #0284c7;
+  border-color: #38bdf8;
+}
+
+.kk-studio-chip-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.14);
+  margin: 4px 2px;
+  flex-shrink: 0;
+}
+
+.kk-studio-sticker-item {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+}
+
+.kk-studio-sticker-item.active {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.kk-studio-filter-item {
+  flex-shrink: 0;
+  min-width: 74px;
+  height: 58px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: #1e293b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.kk-studio-filter-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.kk-studio-filter-item.active {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.kk-studio-bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 12px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  background: #060911;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.kk-studio-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.kk-studio-nav-item.active {
+  color: #4ade80;
+}
