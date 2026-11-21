@@ -105,10 +105,10 @@ async function initUserProfile(user) {
     const newProfile = {
       id: user.id,
       email: user.email,
-      clan: 'green',
-      points: 250,
-      xp: 450,
-      level: 3
+      clan: 'none',
+      points: 0,
+      xp: 0,
+      level: 1
     };
     await supabaseClient.from('profiles').insert([newProfile]);
     currentProfile = newProfile;
@@ -116,8 +116,9 @@ async function initUserProfile(user) {
     currentProfile = data;
   }
 
-  currentClan = currentProfile.clan || 'green';
-  localStorage.setItem('strive_clan', currentClan);
+  if (typeof initClanSystem === 'function') {
+    await initClanSystem();
+  }
   updateProfileUI();
   if (typeof loadMyCoupons === 'function') {
     await loadMyCoupons(currentUser?.id);
@@ -132,7 +133,6 @@ function updateProfileUI() {
   const xpEl = document.getElementById('profile-xp-display');
   const pointsEl = document.getElementById('user-points-val');
   const sponsorPointsEl = document.getElementById('sponsor-user-points');
-  const clanDisplay = document.getElementById('user-clan-display');
   const detailPoints = document.getElementById('detail-points');
 
   if (lvlEl) lvlEl.textContent = `🔰 เลเวล ${currentProfile.level}: เจ้าเมืองผู้ชำนาญการ`;
@@ -141,8 +141,9 @@ function updateProfileUI() {
   if (sponsorPointsEl) sponsorPointsEl.textContent = `${currentProfile.points.toLocaleString()} Points`;
   if (detailPoints) detailPoints.textContent = `${currentProfile.points.toLocaleString()} คะแนน`;
 
-  const clanNames = { green: '🟢 Green Forest', blue: '🔵 Blue Ocean', red: '🔴 Red Blaze' };
-  if (clanDisplay) clanDisplay.textContent = clanNames[currentClan] || '🟢 Green Forest';
+  if (typeof syncUserClanSummaryBanner === 'function') {
+    syncUserClanSummaryBanner();
+  }
 }
 
 function loginSuccess(email) {
@@ -312,26 +313,6 @@ function initSideModeMenu() {
 // ==========================================
 // 🛡️ ระบบแคลน & ทีม (Clan & Guild War)
 // ==========================================
-function openClanSelectModal() {
-  openTopLayer('clan-modal', 'flex');
-}
-function closeClanModal() {
-  closeTopLayer('clan-modal');
-}
-
-async function setClan(clanKey) {
-  currentClan = clanKey;
-  localStorage.setItem('strive_clan', clanKey);
-  const clanNames = { green: '🟢 Green Forest', blue: '🔵 Blue Ocean', red: '🔴 Red Blaze' };
-  document.getElementById('user-clan-display').textContent = clanNames[clanKey] || clanKey;
-
-  if (currentUser && supabaseClient) {
-    await supabaseClient.from('profiles').update({ clan: clanKey }).eq('id', currentUser.id);
-  }
-
-  showToast('🛡️ เปลี่ยนแคลนสำเร็จ: ' + clanNames[clanKey]);
-  closeClanModal();
-}
 
 // ==========================================
 // 🎵 ระบบ Music Widget (Piped API Stream)
@@ -919,6 +900,13 @@ async function executeDatabaseInsert() {
     if (typeof addPlayerXP === 'function') {
       await addPlayerXP(Math.floor(currentDistKm * 50));
     }
+    if (typeof recordClanWarContribution === 'function') {
+      await recordClanWarContribution({
+        distanceMeters: distanceInMeters,
+        steps: stepsVal,
+        isCaptured: Boolean(isCapturedSuccess)
+      });
+    }
     if (typeof loadCapturedTerritories === 'function') {
       loadCapturedTerritories();
     }
@@ -1009,8 +997,10 @@ function switchScreen(screenId) {
 
   if (screenId === 'screen-map' && map) setTimeout(() => map.invalidateSize(), 200);
   if (screenId === 'screen-history') loadHistoryData();
-  if (screenId === 'screen-leaderboard') loadLeaderboardData('area');
   if (screenId === 'screen-profile') updateProfileUI();
+  if (screenId === 'screen-leaderboard' && typeof switchClanSectionTab === 'function') {
+    switchClanSectionTab('leaderboard');
+  }
   if (screenId === 'screen-sponsors') {
     if (typeof initShopModule === 'function') {
       initShopModule();
@@ -1081,44 +1071,6 @@ async function loadHistoryData() {
   } catch (err) {
     container.innerHTML = '<div style="text-align:center; color:#ef4444; padding:20px;">❌ โหลดข้อมูลประวัติไม่สำเร็จ</div>';
   }
-}
-
-async function loadLeaderboardData(type) {
-  const container = document.getElementById('leaderboard-list-container');
-  if (!container || !supabaseClient) return;
-
-  try {
-    const { data: profiles, error } = await supabaseClient
-      .from('profiles')
-      .select('email, clan, xp, level')
-      .order('xp', { ascending: false })
-      .limit(10);
-
-    if (error || !profiles) return;
-
-    let html = '';
-    profiles.forEach((p, idx) => {
-      const rankBadge = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
-      html += `
-        <div style="background:#fff; border-radius:14px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; border:1px solid #f3f4f6; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-weight:bold; color:#eab308;">${rankBadge}</span>
-            <span style="font-size:13px; font-weight:600;">${p.email} [${(p.clan || 'green').toUpperCase()}]</span>
-          </div>
-          <span style="font-weight:700; color:#22c55e;">${p.xp} XP (Lv.${p.level || 1})</span>
-        </div>
-      `;
-    });
-    container.innerHTML = html;
-  } catch (err) { console.error(err); }
-}
-
-function switchLeaderboardTab(type) {
-  document.getElementById('lb-tab-area').style.background = type === 'area' ? '#22c55e' : '#fff';
-  document.getElementById('lb-tab-area').style.color = type === 'area' ? '#fff' : '#4b5563';
-  document.getElementById('lb-tab-dist').style.background = type === 'distance' ? '#22c55e' : '#fff';
-  document.getElementById('lb-tab-dist').style.color = type === 'distance' ? '#fff' : '#4b5563';
-  loadLeaderboardData(type);
 }
 
 let sponsorNodesLayerGroup = null;

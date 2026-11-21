@@ -23,7 +23,8 @@ let studioState = {
     selectedStats: ['time', 'pace', 'steps', 'calories'],
     showRoute: true,
     showLogo: true,
-    sticker: '',
+    stickers: [],
+    selectedStickerId: null,
     filterCss: 'none',
     hasPhoto: false,
     activeCategory: 'panel-templates',
@@ -34,14 +35,14 @@ let studioState = {
         brand: { x: 0, y: 0, scale: 1 },
         route: { x: 0, y: 0, scale: 1 },
         distance: { x: 0, y: 0, scale: 1 },
-        stats: { x: 0, y: 0, scale: 1 },
-        sticker: { x: 0, y: 0, scale: 1 }
+        stats: { x: 0, y: 0, scale: 1 }
     }
 };
 
 let studioBgImageObj = null;
 let studioHintShownOnce = false;
 let activeTargetKey = null;
+let activeStickerId = null;
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
@@ -176,21 +177,33 @@ function updateMandatoryFooterDate() {
 // 2. ระบบควบคุมการลาก (Drag) และย่อ-ขยาย 2 นิ้ว (Pinch-to-Zoom)
 // ============================================================================
 
+function getSelectedStickerItem() {
+    if (!Array.isArray(studioState.stickers) || studioState.stickers.length === 0) return null;
+    const targetId = activeStickerId || studioState.selectedStickerId;
+    return studioState.stickers.find(s => s.id === targetId) || studioState.stickers[studioState.stickers.length - 1];
+}
+
 function resetCustomWidgetsTransform() {
     isDragging = false;
     activeTargetKey = null;
+    activeStickerId = null;
     initialPinchDistance = null;
 
-    if (studioState && studioState.transforms) {
-        Object.keys(studioState.transforms).forEach(key => {
-            studioState.transforms[key] = { x: 0, y: 0, scale: 1 };
-        });
+    if (studioState) {
+        studioState.stickers = [];
+        studioState.selectedStickerId = null;
+        if (studioState.transforms) {
+            Object.keys(studioState.transforms).forEach(key => {
+                studioState.transforms[key] = { x: 0, y: 0, scale: 1 };
+            });
+        }
     }
     applyAllStudioTransforms();
 }
 
 function resetStudioPositionAndScale() {
     resetCustomWidgetsTransform();
+    renderStudioPreview();
     if (typeof showToast === 'function') showToast('รีเซ็ตตำแหน่งและขนาดเรียบร้อย');
 }
 
@@ -205,21 +218,59 @@ function applyAllStudioTransforms() {
     const stage = document.getElementById('studio-template-stage');
     if (!stage) return;
 
-    stage.querySelectorAll('.custom-widget-box').forEach(el => {
+    stage.querySelectorAll('.custom-widget-box:not(.kk-studio-sticker-box)').forEach(el => {
         const key = el.dataset.widgetKey || 'stats';
         const w = studioState.transforms[key] || { x: 0, y: 0, scale: 1 };
         el.style.transform = `translate(${w.x}px, ${w.y}px) scale(${w.scale})`;
         el.style.transformOrigin = 'center center';
         el.style.touchAction = 'none';
     });
+
+    syncStickersTransformsInDOM();
 }
 
-function resolveStudioTargetKey(targetEl) {
+function syncStickersTransformsInDOM() {
+    const stage = document.getElementById('studio-template-stage');
+    if (!stage || !Array.isArray(studioState.stickers)) return;
+
+    const stageRect = stage.getBoundingClientRect();
+    const hasValidRect = stageRect.width > 0 && stageRect.height > 0;
+    const centerX = hasValidRect ? stageRect.width / 2 : 0;
+    const centerY = hasValidRect ? stageRect.height / 2 : 0;
+
+    stage.querySelectorAll('.kk-studio-sticker-box[data-sticker-id]').forEach(el => {
+        const sid = el.getAttribute('data-sticker-id');
+        const item = studioState.stickers.find(s => s.id === sid);
+        if (!item) return;
+
+        const posX = centerX + (item.x || 0);
+        const posY = centerY + (item.y || 0);
+        const scale = item.scale || 1;
+
+        el.style.position = 'absolute';
+        el.style.left = hasValidRect ? `${posX}px` : '50%';
+        el.style.top = hasValidRect ? `${posY}px` : '50%';
+        el.style.transform = hasValidRect
+            ? `translate(-50%, -50%) scale(${scale})`
+            : `translate(calc(-50% + ${item.x || 0}px), calc(-50% + ${item.y || 0}px)) scale(${scale})`;
+        el.style.transformOrigin = 'center center';
+        el.style.touchAction = 'none';
+        el.classList.toggle('is-selected', item.id === studioState.selectedStickerId);
+    });
+}
+
+function resolveStudioTarget(targetEl) {
+    const stickerBox = targetEl ? targetEl.closest('.kk-studio-sticker-box') : null;
+    if (stickerBox && stickerBox.dataset.stickerId) {
+        return { key: 'sticker', stickerId: stickerBox.dataset.stickerId };
+    }
+
     const widget = targetEl ? targetEl.closest('.custom-widget-box') : null;
     if (widget && widget.dataset.widgetKey && studioState.transforms[widget.dataset.widgetKey]) {
-        return widget.dataset.widgetKey;
+        return { key: widget.dataset.widgetKey, stickerId: null };
     }
-    return 'bgPhoto';
+
+    return { key: 'bgPhoto', stickerId: null };
 }
 
 function initStudioTouchGestures() {
@@ -228,16 +279,49 @@ function initStudioTouchGestures() {
     previewBox.dataset.hasListener = 'true';
 
     previewBox.addEventListener('pointerdown', (e) => {
+        if (e.target && e.target.closest('.kk-sticker-delete-btn')) return;
         if (e.pointerType === 'touch' && !e.isPrimary) return;
-        activeTargetKey = resolveStudioTargetKey(e.target);
+
+        const resolved = resolveStudioTarget(e.target);
+        activeTargetKey = resolved.key;
+        activeStickerId = resolved.stickerId;
         isDragging = true;
-        const t = studioState.transforms[activeTargetKey];
-        dragStartX = e.clientX - t.x;
-        dragStartY = e.clientY - t.y;
+
+        if (activeTargetKey === 'sticker' && activeStickerId) {
+            studioState.selectedStickerId = activeStickerId;
+            syncStickersTransformsInDOM();
+            const stk = getSelectedStickerItem();
+            if (stk) {
+                dragStartX = e.clientX - stk.x;
+                dragStartY = e.clientY - stk.y;
+            }
+        } else {
+            if (studioState.selectedStickerId !== null || activeStickerId !== null) {
+                studioState.selectedStickerId = null;
+                activeStickerId = null;
+                syncStickersTransformsInDOM();
+            }
+
+            const t = studioState.transforms[activeTargetKey];
+            if (t) {
+                dragStartX = e.clientX - t.x;
+                dragStartY = e.clientY - t.y;
+            }
+        }
     });
 
     previewBox.addEventListener('pointermove', (e) => {
         if (!isDragging || !activeTargetKey || initialPinchDistance !== null) return;
+
+        if (activeTargetKey === 'sticker') {
+            const stk = getSelectedStickerItem();
+            if (!stk) return;
+            stk.x = e.clientX - dragStartX;
+            stk.y = e.clientY - dragStartY;
+            syncStickersTransformsInDOM();
+            return;
+        }
+
         const t = studioState.transforms[activeTargetKey];
         if (!t) return;
         t.x = e.clientX - dragStartX;
@@ -254,12 +338,26 @@ function initStudioTouchGestures() {
     previewBox.addEventListener('touchstart', (e) => {
         if (e.touches.length === 2) {
             isDragging = false;
-            activeTargetKey = resolveStudioTargetKey(e.target);
+            const resolved = resolveStudioTarget(e.target);
+            activeTargetKey = resolved.key;
+            activeStickerId = resolved.stickerId;
+
+            if (activeTargetKey === 'sticker' && activeStickerId) {
+                studioState.selectedStickerId = activeStickerId;
+                syncStickersTransformsInDOM();
+            }
+
             initialPinchDistance = Math.hypot(
                 e.touches[0].clientX - e.touches[1].clientX,
                 e.touches[0].clientY - e.touches[1].clientY
             );
-            initialPinchScale = studioState.transforms[activeTargetKey]?.scale || 1;
+
+            if (activeTargetKey === 'sticker') {
+                const stk = getSelectedStickerItem();
+                initialPinchScale = stk?.scale || 1;
+            } else {
+                initialPinchScale = studioState.transforms[activeTargetKey]?.scale || 1;
+            }
         }
     }, { passive: true });
 
@@ -270,6 +368,16 @@ function initStudioTouchGestures() {
                 e.touches[0].clientY - e.touches[1].clientY
             );
             const ratio = currentDistance / initialPinchDistance;
+
+            if (activeTargetKey === 'sticker') {
+                const stk = getSelectedStickerItem();
+                if (stk) {
+                    stk.scale = Math.min(3.0, Math.max(0.4, initialPinchScale * ratio));
+                    syncStickersTransformsInDOM();
+                }
+                return;
+            }
+
             const minScale = 0.5;
             const maxScale = activeTargetKey === 'bgPhoto' ? 3.5 : 2.5;
             const t = studioState.transforms[activeTargetKey];
@@ -288,9 +396,21 @@ function initStudioTouchGestures() {
 
     previewBox.addEventListener('wheel', (e) => {
         e.preventDefault();
-        const key = resolveStudioTargetKey(e.target);
+        const resolved = resolveStudioTarget(e.target);
         const delta = e.deltaY < 0 ? 0.08 : -0.08;
-        const t = studioState.transforms[key];
+
+        if (resolved.key === 'sticker' && resolved.stickerId) {
+            studioState.selectedStickerId = resolved.stickerId;
+            activeStickerId = resolved.stickerId;
+            const stk = getSelectedStickerItem();
+            if (stk) {
+                stk.scale = Math.min(3.0, Math.max(0.4, stk.scale + delta));
+                syncStickersTransformsInDOM();
+            }
+            return;
+        }
+
+        const t = studioState.transforms[resolved.key];
         if (t) {
             t.scale = Math.min(3.5, Math.max(0.5, t.scale + delta));
             applyAllStudioTransforms();
@@ -351,11 +471,88 @@ function toggleStudioExtraChip(type) {
     renderStudioPreview();
 }
 
+function removeStudioStickerById(stickerId, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    if (!Array.isArray(studioState.stickers)) return;
+
+    studioState.stickers = studioState.stickers.filter(item => item.id !== stickerId);
+    if (studioState.selectedStickerId === stickerId || activeStickerId === stickerId) {
+        const lastItem = studioState.stickers[studioState.stickers.length - 1];
+        studioState.selectedStickerId = lastItem ? lastItem.id : null;
+        activeStickerId = lastItem ? lastItem.id : null;
+    }
+    renderStickersLayer(document.getElementById('studio-template-stage'));
+}
+
 function selectStudioSticker(stickerVal, itemEl) {
-    studioState.sticker = stickerVal || '';
     document.querySelectorAll('.kk-studio-sticker-item').forEach(el => el.classList.remove('active'));
     if (itemEl) itemEl.classList.add('active');
-    renderStudioPreview();
+
+    if (!Array.isArray(studioState.stickers)) {
+        studioState.stickers = [];
+    }
+
+    if (!stickerVal) {
+        studioState.stickers = [];
+        studioState.selectedStickerId = null;
+        activeStickerId = null;
+        renderStickersLayer(document.getElementById('studio-template-stage'));
+        if (typeof showToast === 'function') showToast('ล้างสติกเกอร์ทั้งหมดแล้ว');
+        return;
+    }
+
+    const idx = studioState.stickers.length;
+    const spreadX = ((idx % 5) - 2) * 20;
+    const spreadY = ((Math.floor(idx / 5) % 3) - 1) * 18;
+
+    const newSticker = {
+        id: 'stk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        emoji: stickerVal,
+        x: spreadX,
+        y: spreadY,
+        scale: 1
+    };
+
+    studioState.stickers.push(newSticker);
+    studioState.selectedStickerId = newSticker.id;
+    activeStickerId = newSticker.id;
+    activeTargetKey = 'sticker';
+
+    const stage = document.getElementById('studio-template-stage');
+    if (stage && !stage.innerHTML.trim()) {
+        renderStudioPreview();
+    } else {
+        renderStickersLayer(stage);
+    }
+}
+
+function renderStickersLayer(stage) {
+    const targetStage = stage || document.getElementById('studio-template-stage');
+    if (!targetStage) return;
+
+    targetStage.querySelectorAll('.kk-studio-sticker-box').forEach(el => el.remove());
+
+    if (!Array.isArray(studioState.stickers) || studioState.stickers.length === 0) return;
+
+    const wrapperHtml = studioState.stickers.map(item => {
+        const isSelected = item.id === studioState.selectedStickerId;
+        return `
+            <div class="custom-widget-box kk-studio-sticker-box ${isSelected ? 'is-selected' : ''}"
+                 data-widget-key="sticker"
+                 data-sticker-id="${item.id}">
+                <span class="kk-sticker-emoji">${item.emoji}</span>
+                <button type="button"
+                        class="kk-sticker-delete-btn"
+                        onclick="removeStudioStickerById('${item.id}', event)"
+                        title="ลบสติกเกอร์ชิ้นนี้">✕</button>
+            </div>
+        `;
+    }).join('');
+
+    targetStage.insertAdjacentHTML('beforeend', wrapperHtml);
+    syncStickersTransformsInDOM();
 }
 
 function selectStudioFilter(filterVal, itemEl) {
@@ -510,10 +707,7 @@ function renderStudioPreview() {
         stage.innerHTML = renderTemplateClassic();
     }
 
-    if (studioState.sticker) {
-        stage.innerHTML += `<div class="custom-widget-box kk-studio-sticker-box" data-widget-key="sticker">${studioState.sticker}</div>`;
-    }
-
+    renderStickersLayer(stage);
     applyAllStudioTransforms();
 }
 
@@ -652,11 +846,18 @@ function generateStudioCanvasBlob() {
             return;
         }
 
+        const prevSelectedId = studioState.selectedStickerId;
+        const prevActiveId = activeStickerId;
+
         try {
             if (typeof html2canvas !== 'undefined') {
                 const hintEl = document.getElementById('studio-first-visit-hint');
                 const prevHintDisplay = hintEl ? hintEl.style.display : '';
                 if (hintEl) hintEl.style.display = 'none';
+
+                studioState.selectedStickerId = null;
+                activeStickerId = null;
+                syncStickersTransformsInDOM();
 
                 const canvas = await html2canvas(previewBox, {
                     scale: 3,
@@ -666,6 +867,9 @@ function generateStudioCanvasBlob() {
                 });
 
                 if (hintEl) hintEl.style.display = prevHintDisplay;
+                studioState.selectedStickerId = prevSelectedId;
+                activeStickerId = prevActiveId;
+                syncStickersTransformsInDOM();
 
                 canvas.toBlob((blob) => resolve(blob), 'image/png', 0.95);
                 return;
@@ -674,6 +878,9 @@ function generateStudioCanvasBlob() {
             console.error('html2canvas error:', err);
         }
 
+        studioState.selectedStickerId = prevSelectedId;
+        activeStickerId = prevActiveId;
+        syncStickersTransformsInDOM();
         resolve(null);
     });
 }

@@ -240,25 +240,53 @@
      🏆 หน้าที่ 2: ตารางอันดับ & สงครามแคลน
      ========================================== -->
   <div id="screen-leaderboard" class="page" style="padding:20px 16px 90px 16px; background:#f9fafb;">
-    <h2 style="font-size:22px; font-weight:700; color:#1f2937; margin-bottom:12px;">🏆 ตารางอันดับ & สงครามแคลน</h2>
-
-    <div
-      style="background:#fff; border-radius:16px; padding:12px; margin-bottom:16px; border:1px solid #f3f4f6; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-      <div>
-        <div style="font-size:11px; color:#6b7280;">แคลน/ทีมของคุณ</div>
-        <div id="user-clan-display" style="font-size:15px; font-weight:700; color:#22c55e;">🟢 Green Forest</div>
-      </div>
-      <button onclick="openClanSelectModal()"
-        style="background:#f3f4f6; border:none; padding:6px 12px; border-radius:10px; font-size:12px; font-weight:600; color:#374151; cursor:pointer;">เปลี่ยนแคลน</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="font-size:22px; font-weight:700; color:#1f2937; margin:0;">🏆 ตารางอันดับ & สงครามแคลน</h2>
     </div>
 
-    <div style="display:flex; gap:8px; margin-bottom:16px;">
-      <button id="lb-tab-area" onclick="switchLeaderboardTab('area')"
-        style="flex:1; padding:10px; border:none; border-radius:12px; font-size:13px; font-weight:700; background:#22c55e; color:white; cursor:pointer;">🏰
-        ตามพื้นที่ (ตร.ม.)</button>
-      <button id="lb-tab-dist" onclick="switchLeaderboardTab('distance')"
-        style="flex:1; padding:10px; border:none; border-radius:12px; font-size:13px; font-weight:700; background:#fff; color:#4b5563; border:1px solid #e5e7eb; cursor:pointer;">📏
-        ตามระยะทาง (กม.)</button>
+    <!-- การ์ดสรุปสังกัดแคลนของผู้ใช้ -->
+    <div
+      style="background:#fff; border-radius:16px; padding:12px 14px; margin-bottom:12px; border:1px solid #f3f4f6; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+      <div style="min-width:0;">
+        <div style="font-size:11px; color:#6b7280;">สังกัดแคลนของคุณ</div>
+        <div id="user-clan-display"
+          style="font-size:15px; font-weight:800; color:#168039; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          🚩 ยังไม่มีสังกัดแคลน</div>
+        <div id="user-clan-subtext" style="font-size:11px; color:#6b7280; margin-top:2px;">
+          เข้าร่วมแคลนหรือสร้างแคลนของตัวเองฟรี</div>
+      </div>
+      <button type="button" id="btn-clan-header-action" onclick="switchClanSectionTab('discover')"
+        style="background:#f3f4f6; border:none; padding:7px 12px; border-radius:10px; font-size:12px; font-weight:700; color:#374151; cursor:pointer; flex-shrink:0;">+
+        สร้าง/หาแคลน</button>
+    </div>
+
+    <!-- แถบสลับหมวดหลัก 3 แท็บ -->
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:12px;">
+      <button type="button" id="clan-nav-leaderboard" onclick="switchClanSectionTab('leaderboard')"
+        style="padding:9px 6px; border:1px solid #168039; border-radius:11px; font-size:12px; font-weight:700; background:#168039; color:#fff; cursor:pointer;">⚔️
+        อันดับสงคราม</button>
+      <button type="button" id="clan-nav-my-clan" onclick="switchClanSectionTab('my-clan')"
+        style="padding:9px 6px; border:1px solid #e5e7eb; border-radius:11px; font-size:12px; font-weight:700; background:#fff; color:#4b5563; cursor:pointer;">🛡️
+        แคลนของฉัน</button>
+      <button type="button" id="clan-nav-discover" onclick="switchClanSectionTab('discover')"
+        style="padding:9px 6px; border:1px solid #e5e7eb; border-radius:11px; font-size:12px; font-weight:700; background:#fff; color:#4b5563; cursor:pointer;">🏰
+        สร้าง/ค้นหา</button>
+    </div>
+
+    <!-- แถบตัวเรียงตารางอันดับสงครามแคลน -->
+    <div id="clan-war-sort-bar" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+      <div id="clan-war-period-title"
+        style="font-size:11.5px; font-weight:700; color:#15803d; background:#dcfce7; padding:5px 10px; border-radius:8px; text-align:center;">
+        สงครามชิงอาณาเขตประจำสัปดาห์
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" id="lb-tab-area" onclick="switchLeaderboardTab('score')"
+          style="flex:1; padding:9px; border:none; border-radius:11px; font-size:12.5px; font-weight:700; background:#22c55e; color:white; cursor:pointer;">⚔️
+          คะแนนสงคราม</button>
+        <button type="button" id="lb-tab-dist" onclick="switchLeaderboardTab('distance')"
+          style="flex:1; padding:9px; border:1px solid #e5e7eb; border-radius:11px; font-size:12.5px; font-weight:700; background:#fff; color:#4b5563; cursor:pointer;">📏
+          ระยะทางรวม (กม.)</button>
+      </div>
     </div>
 
     <div id="leaderboard-list-container">
@@ -706,21 +734,83 @@
     </div>
   </div>
 
-  <div id="clan-modal"
-    style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:#fff;border-radius:24px;padding:24px;max-width:340px;width:100%;">
-      <h3 style="text-align:center;font-size:18px;margin-bottom:16px;">🛡️ เลือกสังกัดแคลน</h3>
-      <button onclick="setClan('green')"
-        style="width:100%;padding:12px;background:#22c55e;color:white;border:none;border-radius:12px;font-weight:600;margin-bottom:10px;cursor:pointer;">🟢
-        Green Forest</button>
-      <button onclick="setClan('blue')"
-        style="width:100%;padding:12px;background:#3b82f6;color:white;border:none;border-radius:12px;font-weight:600;margin-bottom:10px;cursor:pointer;">🔵
-        Blue Ocean</button>
-      <button onclick="setClan('red')"
-        style="width:100%;padding:12px;background:#ef4444;color:white;border:none;border-radius:12px;font-weight:600;margin-bottom:10px;cursor:pointer;">🔴
-        Red Blaze</button>
-      <button onclick="closeClanModal()"
-        style="width:100%;padding:10px;background:#f3f4f6;border:none;border-radius:12px;cursor:pointer;margin-top:4px;">ปิด</button>
+  <!-- 🛡️ Modal สร้างแคลนใหม่ (ฟรีเมื่อผ่านเกณฑ์) -->
+  <div id="create-clan-modal"
+    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:3200; align-items:center; justify-content:center; padding:16px;">
+    <div
+      style="background:#fff; border-radius:24px; padding:22px; max-width:380px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.28);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="font-size:18px; font-weight:800; color:#1f2937; margin:0;">🏰 ก่อตั้งแคลนใหม่</h3>
+        <button type="button" onclick="closeCreateClanModal()"
+          style="background:#f3f4f6; border:none; width:30px; height:30px; border-radius:50%; font-size:15px; font-weight:bold; cursor:pointer;">✕</button>
+      </div>
+
+      <form onsubmit="handleCreateClanSubmit(event)">
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">ชื่อแคลน
+            (2–32 ตัวอักษร)</label>
+          <input type="text" id="new-clan-name" class="auth-input" placeholder="เช่น นักวิ่งพิชิตเขต" maxlength="32"
+            required style="margin-bottom:0;" />
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+          <div>
+            <label style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">แท็กย่อ
+              (2–6 ตัว)</label>
+            <input type="text" id="new-clan-tag" class="auth-input" placeholder="เช่น KKTH" maxlength="6"
+              style="margin-bottom:0; text-transform:uppercase;" />
+          </div>
+          <div>
+            <label
+              style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">ตราประจำแคลน</label>
+            <select id="new-clan-emblem" class="auth-input" style="margin-bottom:0; padding:11px;">
+              <option value="🛡️">🛡️ โล่พิทักษ์</option>
+              <option value="🐉">🐉 มังกรเพลิง</option>
+              <option value="⚡">⚡ สายฟ้า</option>
+              <option value="🦁">🦁 ราชสีห์</option>
+              <option value="🌲">🌲 พงไพร</option>
+              <option value="🌊">🌊 คลื่นสมุทร</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+          <div>
+            <label
+              style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">สีประจำแคลน</label>
+            <select id="new-clan-color" class="auth-input" style="margin-bottom:0; padding:11px;">
+              <option value="#168039">🟢 เขียวพิชิตเขต</option>
+              <option value="#2563eb">🔵 น้ำเงินวายุ</option>
+              <option value="#dc2626">🔴 แดงเพลิงศึก</option>
+              <option value="#d97706">🟠 ทองราชันย์</option>
+              <option value="#7c3aed">🟣 ม่วงรัตติกาล</option>
+            </select>
+          </div>
+          <div>
+            <label
+              style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">การรับสมาชิก</label>
+            <select id="new-clan-join-mode" class="auth-input" style="margin-bottom:0; padding:11px;">
+              <option value="open">เปิดรับเข้าร่วมทันที</option>
+              <option value="approval">ต้องรออนุมัติก่อน</option>
+              <option value="closed">ปิดรับชั่วคราว</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">คำขวัญ /
+            คำอธิบายแคลน</label>
+          <input type="text" id="new-clan-motto" class="auth-input" placeholder="เช่น เดินทุกวัน ยึดทุกโซน!"
+            maxlength="80" style="margin-bottom:0;" />
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button type="button" onclick="closeCreateClanModal()"
+            style="flex:1; padding:11px; background:#f3f4f6; color:#4b5563; border:none; border-radius:12px; font-weight:700; cursor:pointer;">ยกเลิก</button>
+          <button type="submit"
+            style="flex:1; padding:11px; background:#168039; color:#fff; border:none; border-radius:12px; font-weight:700; cursor:pointer;">ก่อตั้งแคลน</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -837,8 +927,8 @@
 
         <!-- ข้อความแนะนำเมื่อยังไม่ใส่รูปถ่าย -->
         <div id="studio-empty-photo-hint" class="kk-studio-empty-hint">
-          <div style="font-size:32px; opacity:0.35; margin-bottom:6px;">🖼️</div>
-          <div>แตะปุ่มกล้อง หรือแกลเลอรีด้านบน<br>เพื่อเพิ่มรูปภาพพื้นหลัง (หรือใช้พื้นหลังสีเข้มนี้ได้เลย)</div>
+          <div style="font-size:32px; opacity:0.35; margin-bottom:6px;"></div>
+          <div>แตะปุ่มกล้อง หรือแกลเลอรีด้านบน<br>เพื่อเพิ่มรูปภาพพื้นหลัง</div>
         </div>
 
         <!-- เลเยอร์ 2: โลโก้ เส้นทาง สถิติ และสติกเกอร์ -->
@@ -923,9 +1013,10 @@
           </div>
         </div>
 
-        <!-- หมวด 3: สติกเกอร์ -->
+        <!-- หมวด 3: สติกเกอร์ (กด 1 ครั้งเพิ่มลงรูปทันที / 🚫 ล้างทั้งหมด) -->
         <div class="kk-studio-options-row" id="panel-stickers">
-          <div class="kk-studio-sticker-item active" onclick="selectStudioSticker('', this)">🚫</div>
+          <div class="kk-studio-sticker-item active" onclick="selectStudioSticker('', this)"
+            title="ล้างสติกเกอร์ทั้งหมด">🚫</div>
           <div class="kk-studio-sticker-item" onclick="selectStudioSticker('🏃‍♂️', this)">🏃‍♂️</div>
           <div class="kk-studio-sticker-item" onclick="selectStudioSticker('🔥', this)">🔥</div>
           <div class="kk-studio-sticker-item" onclick="selectStudioSticker('👑', this)">👑</div>
@@ -1299,6 +1390,7 @@
   </div>
 
   <script src="app.js"></script>
+  <script src="clanModule.js"></script>
   <script src="shopService.js"></script>
   <script src="campaignModule.js"></script>
   <script src="couponModule.js"></script>
