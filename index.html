@@ -64,23 +64,25 @@
             Player</span>
         </div>
         <div style="display:flex; gap:6px;">
-          <button onclick="minimizeMusicWidget()"
+          <button type="button" onclick="minimizeMusicWidget()"
             style="background:#f3f4f6; border:none; width:28px; height:28px; border-radius:50%; font-size:12px; cursor:pointer;">🗕</button>
-          <button onclick="closeMusicWidget()"
+          <button type="button" onclick="closeMusicWidget()"
             style="background:#f3f4f6; border:none; width:28px; height:28px; border-radius:50%; font-size:12px; cursor:pointer;">✕</button>
         </div>
       </div>
+
       <div style="position:relative; margin-bottom:12px;">
         <div style="display:flex; gap:6px;">
-          <input type="text" id="widget-search-input" placeholder="🔍 พิม์ชื่อเพลงหรือศิลปิน..."
+          <input type="text" id="widget-search-input" placeholder="🔍 พิมพ์ชื่อเพลงหรือศิลปิน..."
             style="flex:1; padding:8px 12px; border:1px solid #e5e7eb; border-radius:12px; font-size:12px; outline:none;" />
-          <button onclick="searchAndPlayMusic()"
+          <button type="button" onclick="searchAndPlayMusic()"
             style="background:#10b981; color:white; border:none; padding:8px 14px; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">ค้นหา</button>
         </div>
         <div id="search-results-list"
           style="display:none; position:absolute; top:42px; left:0; right:0; background:white; border:1px solid #e5e7eb; border-radius:12px; max-height:180px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.15); z-index:1005;">
         </div>
       </div>
+
       <div
         style="display:flex; align-items:center; gap:12px; margin-bottom:12px; background:#f3f4f6; padding:8px 12px; border-radius:14px;">
         <div
@@ -90,20 +92,26 @@
           <div id="widget-song-title"
             style="font-size:13px; font-weight:700; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
             เลือกเพลงหรือค้นหาที่ต้องการ</div>
-          <div id="widget-artist" style="font-size:11px; color:#6b7280;">พร้อมสตรีมมิ่งเบื้องหลัง</div>
+          <div id="widget-artist" style="font-size:11px; color:#6b7280;">เล่นผ่าน YouTube ในหน้าเว็บ</div>
         </div>
       </div>
+
+      <!-- กล่องสำหรับฝัง YouTube IFrame Player -->
+      <div id="yt-player-host" style="margin-bottom:12px; border-radius:12px; overflow:hidden;"></div>
+
       <div style="display:flex; justify-content:center; align-items:center; gap:20px;">
-        <button onclick="prevSong()" style="background:none; border:none; font-size:16px; cursor:pointer;">⏮</button>
-        <button id="widget-play-btn" onclick="togglePlayMusic()"
+        <button type="button" onclick="prevSong()"
+          style="background:none; border:none; font-size:16px; cursor:pointer;">⏮</button>
+        <button type="button" id="widget-play-btn" onclick="togglePlayMusic()"
           style="background:#10b981; color:white; border:none; width:40px; height:40px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; justify-content:center; align-items:center;">▶</button>
-        <button onclick="nextSong()" style="background:none; border:none; font-size:16px; cursor:pointer;">⏭</button>
+        <button type="button" onclick="nextSong()"
+          style="background:none; border:none; font-size:16px; cursor:pointer;">⏭</button>
       </div>
     </div>
 
     <div id="music-pill" onclick="restoreMusicWidget()"
-      style="display:none; position:fixed; top:105px; right:16px; background:#1f2937; color:white; padding:8px 14px; border-radius:30px; z-index:1000; box-shadow:0 4px 15px rgba(0,0,0,0.2); cursor:pointer; font-size:12px; font-weight:600; align-items:center; gap:8px;">
-      <span>🎵 เครื่องเล่นเพลง</span>
+      style="display:none; position:fixed; top:120px; right:16px; background:#1f2937; color:white; padding:8px 14px; border-radius:30px; z-index:1000; box-shadow:0 4px 15px rgba(0,0,0,0.2); cursor:pointer; font-size:12px; font-weight:600; align-items:center; gap:8px;">
+      <span>🎵 </span>
     </div>
 
     <!-- เมนูโหมดบนแผนที่แบบปุ่มเดียวขยายออก -->
@@ -1392,6 +1400,7 @@
   <script src="app.js"></script>
   <script src="clanModule.js"></script>
   <script src="shopService.js"></script>
+  <script src="musicService.js"></script>
   <script src="campaignModule.js"></script>
   <script src="couponModule.js"></script>
   <script src="merchantModule.js"></script>
