@@ -850,14 +850,29 @@ function renderTemplateGlass() {
 // 6. Canvas Export & Camera Shortcut Modal
 // ============================================================================
 
+function resolveStudioBgSourceElement() {
+    if (studioBgImageObj && studioBgImageObj.complete && studioBgImageObj.naturalWidth > 0) {
+        return studioBgImageObj;
+    }
+    const bgImgEl = document.getElementById('studio-bg-photo-img');
+    if (bgImgEl && bgImgEl.complete && bgImgEl.naturalWidth > 0) {
+        return bgImgEl;
+    }
+    return null;
+}
+
 function drawStudioBackgroundCoverToCanvas(ctx, canvasWidth, canvasHeight, scaleFactor) {
     ctx.save();
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    if (studioState.hasPhoto && studioBgImageObj && studioBgImageObj.naturalWidth && studioBgImageObj.naturalHeight) {
-        const imgW = studioBgImageObj.naturalWidth;
-        const imgH = studioBgImageObj.naturalHeight;
+    const bgImgEl = document.getElementById('studio-bg-photo-img');
+    const sourceEl = resolveStudioBgSourceElement();
+    const hasBgPhoto = Boolean(sourceEl && (studioState.hasPhoto || (bgImgEl && bgImgEl.getAttribute('src'))));
+
+    if (hasBgPhoto && sourceEl) {
+        const imgW = sourceEl.naturalWidth;
+        const imgH = sourceEl.naturalHeight;
 
         // คำนวณสัดส่วน cover ให้เต็มกรอบโดยไม่บีบสัดส่วนภาพ
         const coverScale = Math.max(canvasWidth / imgW, canvasHeight / imgH);
@@ -875,7 +890,7 @@ function drawStudioBackgroundCoverToCanvas(ctx, canvasWidth, canvasHeight, scale
 
         ctx.translate(canvasWidth / 2 + offsetX, canvasHeight / 2 + offsetY);
         ctx.scale(userScale, userScale);
-        ctx.drawImage(studioBgImageObj, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.drawImage(sourceEl, -drawW / 2, -drawH / 2, drawW, drawH);
     }
 
     ctx.restore();
@@ -895,11 +910,12 @@ function generateStudioCanvasBlob() {
         const prevHintDisplay = hintEl ? hintEl.style.display : '';
         const bgImgEl = document.getElementById('studio-bg-photo-img');
         const prevBgImgDisplay = bgImgEl ? bgImgEl.style.display : '';
+        const sourceEl = resolveStudioBgSourceElement();
 
         try {
             if (typeof html2canvas !== 'undefined') {
                 if (hintEl) hintEl.style.display = 'none';
-                if (bgImgEl && studioState.hasPhoto && studioBgImageObj) {
+                if (bgImgEl && sourceEl) {
                     bgImgEl.style.display = 'none';
                 }
 
@@ -932,7 +948,9 @@ function generateStudioCanvasBlob() {
                 ctx.drawImage(overlayCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
 
                 if (hintEl) hintEl.style.display = prevHintDisplay;
-                if (bgImgEl) bgImgEl.style.display = prevBgImgDisplay;
+                if (bgImgEl) {
+                    bgImgEl.style.display = prevBgImgDisplay || (sourceEl ? 'block' : 'none');
+                }
                 studioState.selectedStickerId = prevSelectedId;
                 activeStickerId = prevActiveId;
                 syncStickersTransformsInDOM();
@@ -945,7 +963,9 @@ function generateStudioCanvasBlob() {
         }
 
         if (hintEl) hintEl.style.display = prevHintDisplay;
-        if (bgImgEl) bgImgEl.style.display = prevBgImgDisplay;
+        if (bgImgEl) {
+            bgImgEl.style.display = prevBgImgDisplay || (sourceEl ? 'block' : 'none');
+        }
         studioState.selectedStickerId = prevSelectedId;
         activeStickerId = prevActiveId;
         syncStickersTransformsInDOM();
