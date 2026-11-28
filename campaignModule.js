@@ -6,27 +6,82 @@ let activeSponsorsList = [];
 let userCouponsList = [];
 let selectedCouponIdForUse = null;
 let couponIdToDelete = null;
+let activeRewardCategory = 'all';
+let isClaimingCampaign = false;
+
+function getCampaignClient() {
+  return (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+}
+
+function escapeCampaignHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getStartOfTodayIso() {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return startOfToday.toISOString();
+}
+
+async function fetchTodayClaimedCampaignIds(client, userId) {
+  const claimedSet = new Set();
+  if (!client || !userId) return claimedSet;
+
+  try {
+    const { data, error } = await client
+      .from('campaign_claims')
+      .select('campaign_id')
+      .eq('user_id', userId)
+      .gte('created_at', getStartOfTodayIso());
+
+    if (!error && Array.isArray(data)) {
+      data.forEach((row) => {
+        if (row && row.campaign_id != null) {
+          claimedSet.add(String(row.campaign_id));
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('ไม่สามารถตรวจสอบรายการรับสิทธิ์วันนี้ได้:', err);
+  }
+
+  return claimedSet;
+}
 
 async function initShopModule() {
   console.log("Initializing Shop & Sponsor Module...");
+  await ensureCurrentUser();
   console.log('Current User ID:', currentUser?.id);
-  await loadShopDataToUI('all');
-  await loadMyCoupons(currentUser?.id);
-  await checkMerchantPermission(currentUser?.id);
-  await updateNotificationBadge();
+
+  await loadShopDataToUI(activeRewardCategory);
+  if (typeof loadMyCoupons === 'function') {
+    await loadMyCoupons(currentUser?.id);
+  }
+  if (typeof checkMerchantPermission === 'function') {
+    await checkMerchantPermission(currentUser?.id);
+  }
+  if (typeof updateNotificationBadge === 'function') {
+    await updateNotificationBadge();
+  }
 }
 
 async function ensureCurrentUser() {
-  if (currentUser && currentUser.id) {
+  if (typeof currentUser !== 'undefined' && currentUser && currentUser.id) {
     return currentUser;
   }
 
   try {
-    if (typeof supabaseClient === 'undefined' || !supabaseClient || !supabaseClient.auth) {
+    const client = getCampaignClient();
+    if (!client || !client.auth) {
       return null;
     }
 
-    const { data, error } = await supabaseClient.auth.getSession();
+    const { data, error } = await client.auth.getSession();
     if (error) {
       console.error('Error restoring session:', error);
       return null;
@@ -44,18 +99,32 @@ async function ensureCurrentUser() {
   }
 }
 
-// 1. แทนที่ฟังก์ชัน loadShopDataToUI เดิม (ปรับเป็น Grid 2 คอลัมน์พอดีหน้าจอมือถือ)
+// 1. โหลดรายการสิทธิประโยชน์แบบ Grid 2 คอลัมน์
 async function loadShopDataToUI(category = 'all') {
+  activeRewardCategory = category || 'all';
   const container = document.getElementById('content-view-container');
   if (!container) return;
 
   container.innerHTML = '<div style="text-align:center; color:#9ca3af; padding:30px 0;">⏳ กำลังโหลดสิทธิประโยชน์...</div>';
 
   try {
-    let campaigns = await fetchActiveCampaigns();
+    if (typeof fetchActiveCampaigns !== 'function') {
+      throw new Error('ไม่พบฟังก์ชัน fetchActiveCampaigns');
+    }
 
-    if (category && category !== 'all') {
-      campaigns = campaigns.filter(camp => camp.category === category);
+    await ensureCurrentUser();
+    const client = getCampaignClient();
+    const uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? currentUser.id : null;
+
+    const [rawCampaigns, claimedTodaySet] = await Promise.all([
+      fetchActiveCampaigns(),
+      fetchTodayClaimedCampaignIds(client, uid)
+    ]);
+
+    let campaigns = rawCampaigns || [];
+
+    if (activeRewardCategory !== 'all') {
+      campaigns = campaigns.filter(camp => camp.category === activeRewardCategory);
     }
 
     if (!campaigns || campaigns.length === 0) {
@@ -63,50 +132,61 @@ async function loadShopDataToUI(category = 'all') {
       return;
     }
 
-    // ปรับเป็น 2 คอลัมน์ (repeat(2, 1fr)) และจัดช่องไฟให้เหมาะกับหน้าจอมือถือ
     let html = '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 16px 16px 16px;">';
     campaigns.forEach(camp => {
       const sponsorName = (camp.merchant_name && camp.merchant_name.trim() !== '')
         ? camp.merchant_name
         : (camp.sponsors && camp.sponsors.name ? camp.sponsors.name : 'KaoKhet Partner');
 
-      const imageUrl = camp.image_url ? camp.image_url : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=500&q=80';
-      const endDateStr = camp.end_date ? new Date(camp.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : 'ไม่จำกัดเวลา';
+      const fallbackImg = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=500&q=80';
+      const imageUrl = camp.image_url ? camp.image_url : fallbackImg;
+      const endDateStr = camp.end_date
+        ? new Date(camp.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })
+        : 'ไม่จำกัดเวลา';
 
-      const totalLimit = camp.total_limit || 10;
-      const claimedCount = camp.claimed_count || 0;
+      const totalLimit = camp.total_limit ?? 10;
+      const claimedCount = camp.claimed_count ?? 0;
       const remaining = totalLimit - claimedCount;
       const isSoldOut = remaining <= 0;
-      const pointsCost = camp.points_cost || 0;
+      const isAlreadyClaimedToday = claimedTodaySet.has(String(camp.id));
+      const isDisabled = isSoldOut || isAlreadyClaimedToday;
+      const pointsCost = camp.points_cost ?? 0;
 
       const stockBadge = isSoldOut
         ? `<span style="position:absolute; top:6px; left:6px; background:rgba(239,68,68,0.9); color:#fff; font-size:8px; font-weight:700; padding:2px 5px; border-radius:6px;">❌ หมดแล้ว</span>`
-        : `<span style="position:absolute; top:6px; left:6px; background:rgba(34,197,94,0.9); color:#fff; font-size:8px; font-weight:700; padding:2px 5px; border-radius:6px;">🔥 เหลือ ${remaining}/${totalLimit}</span>`;
+        : isAlreadyClaimedToday
+          ? `<span style="position:absolute; top:6px; left:6px; background:rgba(107,114,128,0.92); color:#fff; font-size:8px; font-weight:700; padding:2px 5px; border-radius:6px;">✓ รับแล้ววันนี้</span>`
+          : `<span style="position:absolute; top:6px; left:6px; background:rgba(34,197,94,0.9); color:#fff; font-size:8px; font-weight:700; padding:2px 5px; border-radius:6px;">🔥 เหลือ ${remaining}/${totalLimit}</span>`;
 
-      const cardOpacity = isSoldOut ? 'opacity: 0.65; background:#f9fafb;' : 'background:#fff;';
-      const btnStyle = isSoldOut
+      const cardOpacity = isDisabled ? 'opacity: 0.72; background:#f9fafb;' : 'background:#fff;';
+      const btnStyle = isDisabled
         ? `width:100%; border:none; padding:7px; border-radius:10px; font-size:11px; font-weight:700; background:#9ca3af; color:#fff; cursor:not-allowed;`
         : `width:100%; border:none; padding:7px; border-radius:10px; font-size:11px; font-weight:700; background:#22c55e; color:#fff; cursor:pointer;`;
 
-      const btnAction = isSoldOut ? '' : `onclick="handleClaimCampaign('${camp.id}', '${camp.reward_details ? camp.reward_details.replace(/'/g, "\\'") : 'สิทธิ์พิเศษ'}') "`;
-      const btnText = isSoldOut ? 'สิทธิ์เต็มแล้ว' : `🪙 ${pointsCost} Points`;
+      const safeId = escapeCampaignHtml(camp.id);
+      const btnAction = isDisabled ? 'disabled aria-disabled="true"' : `onclick="handleClaimCampaign('${safeId}')"`;
+      const btnText = isSoldOut
+        ? 'สิทธิ์เต็มแล้ว'
+        : isAlreadyClaimedToday
+          ? 'รับสิทธิ์แล้ว'
+          : `🪙 ${pointsCost} Points`;
 
       html += `
         <div style="${cardOpacity} border-radius:16px; overflow:hidden; border:1px solid #e5e7eb; box-shadow:0 2px 8px rgba(0,0,0,0.04); display:flex; flex-direction:column; justify-content:space-between; min-width:0;">
           <div style="position:relative; width:100%; height:105px; background:#e5e7eb;">
-            <img src="${imageUrl}" style="width:100%; height:100%; object-fit:cover;" alt="Campaign Banner" />
+            <img src="${escapeCampaignHtml(imageUrl)}" onerror="this.onerror=null;this.src='${fallbackImg}';" style="width:100%; height:100%; object-fit:cover;" alt="Campaign Banner" />
             ${stockBadge}
-            <span style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); color:#fff; font-size:8px; font-weight:600; padding:2px 5px; border-radius:6px; backdrop-filter:blur(4px);">⏳ ${endDateStr}</span>
+            <span style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); color:#fff; font-size:8px; font-weight:600; padding:2px 5px; border-radius:6px; backdrop-filter:blur(4px);">⏳ ${escapeCampaignHtml(endDateStr)}</span>
           </div>
           <div style="padding:10px; display:flex; flex-direction:column; flex:1; justify-content:space-between;">
             <div>
-              <div style="font-size:9px; color:#3b82f6; font-weight:700; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sponsorName}</div>
-              <div style="font-size:12px; font-weight:700; color:#1f2937; margin:3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${camp.title}">${camp.title}</div>
-              <div style="font-size:10px; color:#6b7280; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${camp.description || 'สิทธิ์พิเศษสำหรับชาว KaoKhet'}</div>
+              <div style="font-size:9px; color:#3b82f6; font-weight:700; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeCampaignHtml(sponsorName)}</div>
+              <div style="font-size:12px; font-weight:700; color:#1f2937; margin:3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeCampaignHtml(camp.title)}">${escapeCampaignHtml(camp.title)}</div>
+              <div style="font-size:10px; color:#6b7280; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeCampaignHtml(camp.description || 'สิทธิ์พิเศษสำหรับชาว KaoKhet')}</div>
             </div>
             <div>
-              <div style="font-size:10px; font-weight:800; color:#16a34a; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🎁 ${camp.reward_details || 'สิทธิ์พิเศษ'}</div>
-              <button ${btnAction} style="${btnStyle}">${btnText}</button>
+              <div style="font-size:10px; font-weight:800; color:#16a34a; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🎁 ${escapeCampaignHtml(camp.reward_details || 'สิทธิ์พิเศษ')}</div>
+              <button type="button" ${btnAction} style="${btnStyle}">${btnText}</button>
             </div>
           </div>
         </div>
@@ -141,44 +221,134 @@ function filterRewards(category, btnElement) {
   loadShopDataToUI(category);
 }
 
-// 3. ฟังก์ชันกดรับสิทธิ์แคมเปญ (เช็กสิทธิ์แบบรีเซ็ตทุกเที่ยงคืน 00:00 น.)
-async function handleClaimCampaign(campaignId, rewardTitle) {
-  console.log('[handleClaimCampaign] before ensureCurrentUser:', currentUser);
-  await ensureCurrentUser();
-  console.log('[handleClaimCampaign] after ensureCurrentUser:', currentUser);
+// 3. ฟังก์ชันกดรับสิทธิ์แคมเปญ (เช็กเงื่อนไขป้อมปราการ / เรดบอส + รีเซ็ตทุกเที่ยงคืน 00:00 น.)
+function getBangkokDateKey(dateObj = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(dateObj);
 
-  if (!currentUser || !currentUser.id) {
-    showToast('⚠️ กรุณาล็อกอินก่อนกดรับสิทธิ์');
+  const y = parts.find((p) => p.type === 'year')?.value || '1970';
+  const m = parts.find((p) => p.type === 'month')?.value || '01';
+  const d = parts.find((p) => p.type === 'day')?.value || '01';
+  return `${y}-${m}-${d}`;
+}
+
+async function validateCampaignClaimRules(campaignData) {
+  const rawType = String(campaignData.campaign_type || '').toLowerCase().trim();
+  const mode = rawType || (campaignData.is_raid_boss ? 'raid_boss' : (campaignData.is_secret_node ? 'fortress' : 'normal'));
+  const todayKey = getBangkokDateKey();
+
+  if (mode === 'fortress' || Boolean(campaignData.is_secret_node)) {
+    const checkedKey = `checked_node_${currentUser.id}_${campaignData.id}_${todayKey}`;
+    const radiusMeters = Number(campaignData.node_radius) > 0 ? Number(campaignData.node_radius) : 50;
+    if (localStorage.getItem(checkedKey) !== 'true') {
+      return {
+        ok: false,
+        message: `🏰 กรุณาเดินทางไปเช็กอินในรัศมีป้อมปราการ (${radiusMeters} ม.) ก่อนรับสิทธิ์`
+      };
+    }
+  }
+
+  if (mode === 'raid_boss' || Boolean(campaignData.is_raid_boss)) {
+    const targetKm = Number(campaignData.target_distance_km);
+    const currentKm = Number(campaignData.current_distance_km) || 0;
+    const minPlayerKm = Number(campaignData.min_distance_km);
+    const requiredTargetKm = targetKm > 0 ? targetKm : 10;
+    const requiredMinPlayerKm = minPlayerKm > 0 ? minPlayerKm : 1;
+
+    const contribKey = `raid_contrib_${currentUser.id}_${campaignData.id}_${todayKey}`;
+    const myContribKm = Number(localStorage.getItem(contribKey) || 0);
+
+    // ถ้าระยะทางสะสมของผู้เล่นในระบบมีอยู่ ให้เช็กเทียบกับระยะทางสะสมของผู้เล่นด้วย
+    const playerTotalKm = typeof totalDistance !== 'undefined'
+      ? Number(totalDistance)
+      : (typeof userTotalDistanceKm !== 'undefined' ? Number(userTotalDistanceKm) : myContribKm);
+
+    if (currentKm < requiredTargetKm) {
+      return {
+        ok: false,
+        message: `🐲 บอสยังไม่ถูกพิชิต (${currentKm.toFixed(1)}/${requiredTargetKm} กม.) ร่วมสะสมระยะทางให้ครบเป้าก่อนครับ`
+      };
+    }
+
+    if (myContribKm < requiredMinPlayerKm || playerTotalKm < requiredMinPlayerKm) {
+      const effectiveDist = Math.min(myContribKm, playerTotalKm);
+      return {
+        ok: false,
+        message: `📏 ระยะทางสะสมของคุณ (${effectiveDist.toFixed(2)} กม.) ยังไม่ถึงเกณฑ์ขั้นต่ำ ${requiredMinPlayerKm} กม.`
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+async function handleClaimCampaign(campaignId, rewardTitle) {
+  if (isClaimingCampaign) return;
+
+  await ensureCurrentUser();
+  const client = getCampaignClient();
+
+  if (!currentUser || !currentUser.id || !client) {
+    if (typeof showToast === 'function') showToast('⚠️ กรุณาล็อกอินก่อนกดรับสิทธิ์');
     return;
   }
 
+  isClaimingCampaign = true;
   let pointsDeducted = false;
   let previousPoints = 0;
-  let claimInserted = false;
+  let insertedClaimId = null;
 
   try {
-    showToast('⏳ กำลังตรวจสอบสิทธิ์และแต้ม...');
+    if (typeof showToast === 'function') showToast('⏳ กำลังตรวจสอบสิทธิ์และแต้ม...');
 
-    const { data: campaignData, error: fetchError } = await supabaseClient
+    const { data: campaignData, error: fetchError } = await client
       .from('campaigns')
-      .select('total_limit, claimed_count, points_cost, title')
+      .select('id, total_limit, claimed_count, points_cost, title, reward_details, is_active, campaign_type, is_secret_node, is_raid_boss, node_radius, current_distance_km, target_distance_km, min_distance_km')
       .eq('id', campaignId)
       .single();
 
     if (fetchError) throw fetchError;
 
-    const totalLimit = campaignData.total_limit || 10;
-    const claimedCount = campaignData.claimed_count || 0;
-    const pointsCost = campaignData.points_cost || 0;
-    const resolvedRewardLabel = rewardTitle || campaignData.title || 'สิทธิ์พิเศษ';
+    const totalLimit = campaignData.total_limit ?? 10;
+    const claimedCount = campaignData.claimed_count ?? 0;
+    const pointsCost = campaignData.points_cost ?? 0;
+    const resolvedRewardLabel = rewardTitle || campaignData.title || campaignData.reward_details || 'สิทธิ์พิเศษ';
 
-    if (claimedCount >= totalLimit) {
-      showToast('❌ เสียใจด้วยครับ สิทธิ์แคมเปญนี้เต็มแล้ว');
-      await loadShopDataToUI('all');
+    if (campaignData.is_active === false || claimedCount >= totalLimit) {
+      if (typeof showToast === 'function') showToast('❌ เสียใจด้วยครับ สิทธิ์แคมเปญนี้เต็มแล้ว');
+      await loadShopDataToUI(activeRewardCategory);
       return;
     }
 
-    const { data: profileData, error: profileError } = await supabaseClient
+    const ruleCheck = await validateCampaignClaimRules(campaignData);
+    if (!ruleCheck.ok) {
+      if (typeof showToast === 'function') showToast(ruleCheck.message);
+      return;
+    }
+
+    const { data: todayClaim, error: claimCheckError } = await client
+      .from('campaign_claims')
+      .select('id, created_at')
+      .eq('user_id', currentUser.id)
+      .eq('campaign_id', campaignId)
+      .gte('created_at', getStartOfTodayIso())
+      .maybeSingle();
+
+    if (claimCheckError) throw claimCheckError;
+
+    if (todayClaim) {
+      if (typeof showToast === 'function') {
+        showToast('⚠️ คุณรับสิทธิ์วันนี้ไปแล้ว สามารถกดรับซ้ำได้ใหม่หลังเที่ยงคืน (00:00 น.) ครับ');
+      }
+      await loadShopDataToUI(activeRewardCategory);
+      return;
+    }
+
+    const { data: profileData, error: profileError } = await client
       .from('profiles')
       .select('points')
       .eq('id', currentUser.id)
@@ -190,30 +360,14 @@ async function handleClaimCampaign(campaignId, rewardTitle) {
     previousPoints = userPoints;
 
     if (userPoints < pointsCost) {
-      showToast(`❌ แต้มของคุณไม่พอ (ต้องการ ${pointsCost} Points / คุณมี ${userPoints} Points)`);
-      return;
-    }
-
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const { data: todayClaim, error: claimCheckError } = await supabaseClient
-      .from('campaign_claims')
-      .select('id, created_at')
-      .eq('user_id', currentUser.id)
-      .eq('campaign_id', campaignId)
-      .gte('created_at', startOfToday.toISOString())
-      .maybeSingle();
-
-    if (claimCheckError) throw claimCheckError;
-
-    if (todayClaim) {
-      showToast('⚠️ คุณรับสิทธิ์วันนี้ไปแล้ว สามารถกดรับซ้ำได้ใหม่หลังเที่ยงคืน (00:00 น.) ครับ');
+      if (typeof showToast === 'function') {
+        showToast(`❌ แต้มของคุณไม่พอ (ต้องการ ${pointsCost} Points / คุณมี ${userPoints} Points)`);
+      }
       return;
     }
 
     const newPoints = userPoints - pointsCost;
-    const { error: updatePointsError } = await supabaseClient
+    const { error: updatePointsError } = await client
       .from('profiles')
       .update({ points: newPoints })
       .eq('id', currentUser.id);
@@ -221,62 +375,70 @@ async function handleClaimCampaign(campaignId, rewardTitle) {
     if (updatePointsError) throw updatePointsError;
     pointsDeducted = true;
 
-    const { error: insertClaimError } = await supabaseClient
+    const { data: insertedClaim, error: insertClaimError } = await client
       .from('campaign_claims')
-      .insert([{ user_id: currentUser.id, campaign_id: campaignId }]);
+      .insert([{ user_id: currentUser.id, campaign_id: campaignId }])
+      .select('id')
+      .single();
 
-    if (insertClaimError) {
-      throw insertClaimError;
-    }
-    claimInserted = true;
+    if (insertClaimError) throw insertClaimError;
+    insertedClaimId = insertedClaim?.id || null;
 
     const dummyCode = 'KAOKHET-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    const result = await claimUserCoupon(currentUser.id, campaignId, dummyCode);
+    const result = typeof claimUserCoupon === 'function'
+      ? await claimUserCoupon(currentUser.id, campaignId, dummyCode)
+      : { success: false, message: 'ไม่พบฟังก์ชัน claimUserCoupon' };
 
     if (!result || !result.success) {
       throw new Error((result && result.message) || 'ไม่สามารถบันทึกคูปองลงกระเป๋าได้');
     }
 
-    const { error: updateError } = await supabaseClient
+    const { error: updateError } = await client
       .from('campaigns')
       .update({ claimed_count: claimedCount + 1 })
       .eq('id', campaignId);
 
     if (updateError) throw updateError;
 
-    showToast(`🎉 แลกรับ "${resolvedRewardLabel}" สำเร็จ! หัก ${pointsCost} Points (เหลือ ${newPoints} Points)`);
+    if (typeof showToast === 'function') {
+      showToast(`🎉 แลกรับ "${resolvedRewardLabel}" สำเร็จ! หัก ${pointsCost} Points (เหลือ ${newPoints} Points)`);
+    }
 
     const pointsDisplay = document.getElementById('user-points-val');
     if (pointsDisplay) pointsDisplay.innerText = `${newPoints} Points`;
     const sponsorPointsDisplay = document.getElementById('sponsor-user-points');
     if (sponsorPointsDisplay) sponsorPointsDisplay.innerText = `${newPoints} Points`;
 
-    await Promise.all([
-      loadMyCoupons(currentUser.id),
-      loadShopDataToUI('all')
-    ]);
+    const refreshTasks = [loadShopDataToUI(activeRewardCategory)];
+    if (typeof loadMyCoupons === 'function') {
+      refreshTasks.push(loadMyCoupons(currentUser.id));
+    }
+    await Promise.all(refreshTasks);
 
   } catch (err) {
-    if (claimInserted) {
-      await supabaseClient
+    if (insertedClaimId && client) {
+      await client
         .from('campaign_claims')
         .delete()
-        .eq('user_id', currentUser.id)
-        .eq('campaign_id', campaignId);
+        .eq('id', insertedClaimId);
     }
-    if (pointsDeducted) {
-      await supabaseClient
+    if (pointsDeducted && client) {
+      await client
         .from('profiles')
         .update({ points: previousPoints })
         .eq('id', currentUser.id);
     }
     console.error('Error claiming campaign:', err);
-    showToast('❌ ไม่สามารถรับสิทธิ์ได้: ' + (err.message || 'เกิดข้อผิดพลาด'));
+    if (typeof showToast === 'function') {
+      showToast('❌ ไม่สามารถรับสิทธิ์ได้: ' + (err.message || 'เกิดข้อผิดพลาด'));
+    }
+  } finally {
+    isClaimingCampaign = false;
   }
 }
 
 // ==========================================
-// 🔀 ฟังก์ชันแท็บ, อัปโหลดแบนเนอร์ และกริดสปอนเซอร์ (ที่เพิ่มใหม่)
+// 🔀 ฟังก์ชันแท็บ และกริดสปอนเซอร์
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
   const mainTabBtns = document.querySelectorAll('.main-tab-btn');
@@ -334,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (urlParams.get('tab') === 'sponsor') {
     const sponsorTabBtn = document.querySelector('.main-tab-btn[data-tab="sponsor"]');
     if (sponsorTabBtn) {
-      activateMainTab('all', true);
+      activateMainTab('sponsor', true);
     } else if (typeof loadSponsorBanners === 'function') {
       if (subCategoriesWrapper) subCategoriesWrapper.style.display = 'none';
       loadSponsorBanners();
@@ -351,41 +513,46 @@ function loadCampaigns(category) {
   loadShopDataToUI(category);
 }
 
-// ฟังก์ชันดึงข้อมูลแบนเนอร์ร้านค้ามาแสดงผลแบบกริดแนวตั้ง (ใช้ supabaseClient)
+// ฟังก์ชันดึงข้อมูลแบนเนอร์ร้านค้ามาแสดงผลแบบกริดแนวตั้ง
 async function loadSponsorBanners() {
   const container = document.getElementById('content-view-container');
+  if (!container) return;
+
+  const client = getCampaignClient();
+  if (!client) {
+    container.innerHTML = `<p style="text-align: center; color: #ef4444; padding: 20px;">ไม่พบการเชื่อมต่อฐานข้อมูล</p>`;
+    return;
+  }
+
   container.innerHTML = `<p style="text-align: center; color: #9ca3af; padding: 20px;">กำลังโหลดแบนเนอร์สปอนเซอร์...</p>`;
 
   try {
-    const { data: stores, error } = await supabaseClient
+    const { data: stores, error } = await client
       .from('store_profiles')
       .select('id, store_name, banner_url');
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
     if (!stores || stores.length === 0) {
       container.innerHTML = `<p style="text-align: center; color: #9ca3af; padding: 20px;">ยังไม่มีข้อมูลร้านค้าหรือสปอนเซอร์ในขณะนี้</p>`;
       return;
     }
 
-    let gridHtml = `
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 16px;">
-        `;
+    let gridHtml = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 16px;">`;
 
     stores.forEach(store => {
       const bannerImage = store.banner_url || 'default-banner.png';
       const storeName = store.store_name || 'ร้านค้าไม่มีชื่อ';
+      const safeStoreId = escapeCampaignHtml(store.id);
 
       gridHtml += `
-                <div onclick="goToStoreProfile('${store.id}')" style="background: #1f2937; border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onmouseover="this.style.transform='translateY(-4px)';" onmouseout="this.style.transform='translateY(0)';">
-                    <img src="${bannerImage}" alt="${storeName}" style="width: 100%; height: 160px; object-fit: cover;">
-                    <div style="padding: 12px; text-align: center; color: #ffffff; font-weight: 600; font-size: 16px;">
-                        ${storeName}
-                    </div>
-                </div>
-            `;
+        <div onclick="if(typeof goToStoreProfile === 'function') goToStoreProfile('${safeStoreId}')" style="background: #1f2937; border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onmouseover="this.style.transform='translateY(-4px)';" onmouseout="this.style.transform='translateY(0)';">
+          <img src="${escapeCampaignHtml(bannerImage)}" onerror="this.onerror=null;this.src='default-banner.png';" alt="${escapeCampaignHtml(storeName)}" style="width: 100%; height: 160px; object-fit: cover;">
+          <div style="padding: 12px; text-align: center; color: #ffffff; font-weight: 600; font-size: 16px;">
+            ${escapeCampaignHtml(storeName)}
+          </div>
+        </div>
+      `;
     });
 
     gridHtml += `</div>`;

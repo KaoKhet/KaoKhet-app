@@ -12,6 +12,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/dist/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#091526">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="./icon-192.png">
 </head>
 
 <body>
@@ -24,11 +29,13 @@
       <div style="text-align:center; margin-bottom:20px;">
         <img src="kaokhetlogo0.png" alt="KaoKhet"
           style="height:64px; width:auto; object-fit:contain; margin:0 auto 6px; display:block;" />
-        <p style="font-size:12px; color:#6b7280; margin-top:4px;">เดินเพื่อพื้นที่ของเรา & สงครามแคลน</p>
+        <p style="font-size:12px; color:#6b7280; margin-top:4px;">เดินเพื่อพื้นที่ของเรา &amp; สงครามแคลน</p>
       </div>
       <form id="auth-form" onsubmit="handleAuthLogin(event)">
         <input type="email" id="auth-email" placeholder="อีเมลของคุณ" class="auth-input" required />
         <input type="password" id="auth-password" placeholder="รหัสผ่าน" class="auth-input" required />
+        <input type="text" id="auth-display-name" placeholder="ชื่อที่แสดง (ไม่บังคับ)" maxlength="40"
+          class="auth-input" />
         <button type="submit" class="auth-btn">เข้าสู่ระบบ / สมัครสมาชิก</button>
       </form>
     </div>
@@ -49,7 +56,7 @@
       <div class="top-actions">
         <button type="button" class="top-icon-btn" onclick="openNotificationsModal()" title="การแจ้งเตือน">
           🔔
-          <span id="notification-badge" class="top-badge">2</span>
+          <span id="notification-badge" class="top-badge" style="display:none;">0</span>
         </button>
       </div>
     </div>
@@ -190,7 +197,7 @@
           <button type="button" id="music-btn" class="icon-btn" onclick="openMusicWidget()" title="เพลง">🎵</button>
           <button type="button" id="start-btn" class="main-action-btn">KAOKHET</button>
           <button type="button" id="camera-btn" class="icon-btn" onclick="openCameraShortcutModal()"
-            title="ถ่ายภาพ & แนบสถิติ">📸</button>
+            title="ถ่ายภาพ &amp; แนบสถิติ">📸</button>
         </div>
 
         <!-- ส่วนล่าง — แสดงเฉพาะตอนขยาย (จัด Grid 2 คอลัมน์สมดุลและเลื่อนดูได้ไม่ล้น) -->
@@ -249,7 +256,7 @@
      ========================================== -->
   <div id="screen-leaderboard" class="page" style="padding:20px 16px 90px 16px; background:#f9fafb;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h2 style="font-size:22px; font-weight:700; color:#1f2937; margin:0;">🏆 ตารางอันดับ & สงครามแคลน</h2>
+      <h2 style="font-size:22px; font-weight:700; color:#1f2937; margin:0;">🏆 ตารางอันดับ &amp; สงครามแคลน</h2>
     </div>
 
     <!-- การ์ดสรุปสังกัดแคลนของผู้ใช้ -->
@@ -306,7 +313,7 @@
      📊 หน้าที่ 3: ประวัติการเดินทาง & ภารกิจประจำวัน
      ========================================== -->
   <div id="screen-history" class="page" style="padding:20px 16px 90px 16px; background:#f9fafb;">
-    <h2 style="font-size:22px; font-weight:700; color:#1f2937; margin-bottom:16px;">📊 ประวัติ & ภารกิจประจำวัน</h2>
+    <h2 style="font-size:22px; font-weight:700; color:#1f2937; margin-bottom:16px;">📊 ประวัติ &amp; ภารกิจประจำวัน</h2>
 
     <!-- ภารกิจประจำวัน (Daily Quests) -->
     <div
@@ -353,11 +360,11 @@
      🏪 หน้าที่ 4: ร้านค้า & สปอนเซอร์
      ========================================== -->
   <div id="screen-sponsors" class="page" style="padding:20px 16px 90px 16px; background:#f9fafb;">
-    <h2>🏪 ร้านค้า & สปอนเซอร์</h2>
+    <h2>🏪 ร้านค้า &amp; สปอนเซอร์</h2>
 
     <!-- UI สำหรับผู้ประกอบการ: รวมฟังก์ชันทั้งหมดในการ์ดเดียว -->
     <div id="merchant-control-panel" class="merchant-dashboard-card"
-      style="display: none; background: #1e1e2f; color: #fff; padding: 16px; border-radius: 12px; margin-top: 16px;">
+      style="display: none; background: #1e1e2f; color: #fff; padding: 16px; border-radius: 12px; margin-top: 16px; margin-bottom: 16px;">
       <h3 style="margin: 0 0 12px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
         <span>🏪</span> ระบบบริหารจัดการและตรวจสอบสิทธิ์
       </h3>
@@ -366,7 +373,7 @@
       <div style="display: flex; gap: 8px; margin-bottom: 12px;">
         <input type="text" id="merchant-coupon-input" placeholder="เช่น KAOKHET-XXXXXX"
           style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #444; background: #2a2a3e; color: #fff; font-size: 13px;" />
-        <button onclick="handleMerchantRedeemClick()"
+        <button type="button" onclick="handleMerchantRedeemClick()"
           style="background: #4f46e5; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
           ตรวจสอบ
         </button>
@@ -374,17 +381,19 @@
 
       <!-- แถบปุ่ม 3 ปุ่ม -->
       <div class="merchant-actions-grid">
-        <button id="btn-scan-qr" onclick="handleScanQRClick()" class="merchant-action-btn btn-scan">
+        <button type="button" id="btn-scan-qr" onclick="handleScanQRClick()" class="merchant-action-btn btn-scan">
           <span>📷</span>
           <span>สแกน QR</span>
         </button>
 
-        <button id="btn-view-history" onclick="openMerchantHistoryModal()" class="merchant-action-btn btn-history">
+        <button type="button" id="btn-view-history" onclick="openMerchantHistoryModal()"
+          class="merchant-action-btn btn-history">
           <span>📋</span>
           <span>ประวัติสิทธิ์</span>
         </button>
 
-        <button id="btn-add-campaign" onclick="openSponsorForm()" class="merchant-action-btn btn-campaign">
+        <button type="button" id="btn-add-campaign" onclick="openSponsorForm()"
+          class="merchant-action-btn btn-campaign">
           <span>จัดการแคมเปญ</span>
         </button>
       </div>
@@ -393,7 +402,7 @@
       <div id="qr-reader-container" style="display: none; margin-top: 12px; text-align: center;">
         <div id="qr-reader"
           style="width: 100%; max-width: 300px; margin: 0 auto; border-radius: 8px; overflow: hidden;"></div>
-        <button onclick="stopQRScanner()"
+        <button type="button" onclick="stopQRScanner()"
           style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; margin-top: 8px; cursor: pointer; font-size: 12px;">
           ปิดกล้อง
         </button>
@@ -430,10 +439,10 @@
       <!-- ปุ่มทางลัดด้านในกล่องพ้อยท์ -->
       <div
         style="position: relative; z-index: 1; display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 12px;">
-        <button onclick="switchScreen('screen-history')"
+        <button type="button" onclick="switchScreen('screen-history')"
           style="flex: 1; background: rgba(255,255,255,0.2); border: none; padding: 6px 10px; border-radius: 10px; color: white; font-size: 11px; font-weight: 600; cursor: pointer; backdrop-filter: blur(4px); transition: background 0.2s;">📜
           ประวัติแต้ม</button>
-        <button onclick="showToast('💡 วิ่งสะสมระยะทางเพื่อรับแต้มเพิ่มทุกวัน!')"
+        <button type="button" onclick="showToast('💡 วิ่งสะสมระยะทางและยึดพื้นที่เพื่อรับแต้มเพิ่มทุกวัน!')"
           style="flex: 1; background: rgba(255,255,255,0.2); border: none; padding: 6px 10px; border-radius: 10px; color: white; font-size: 11px; font-weight: 600; cursor: pointer; backdrop-filter: blur(4px);">⚡
           วิธีรับแต้มเพิ่ม</button>
       </div>
@@ -442,12 +451,19 @@
     <!-- 2. โซนกระเป๋าคูปองของฉัน -->
     <div
       style="background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); border: 1px solid #f3f4f6;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div
+        style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
         <h3 style="font-size: 15px; font-weight: 700; color: #1f2937; margin:0;">🎟️ กระเป๋าคูปองของฉัน</h3>
-        <div class="wallet-nav-bar" id="walletNavBar" style="display: none;">
-          <button type="button" class="wallet-nav-arrow" id="walletPrevBtn">‹</button>
-          <div class="wallet-page-dots" id="walletPageDots"></div>
-          <button type="button" class="wallet-nav-arrow" id="walletNextBtn">›</button>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-nav-bar" id="walletNavBar" style="display: none;">
+            <button type="button" class="wallet-nav-arrow" id="walletPrevBtn">‹</button>
+            <div class="wallet-page-dots" id="walletPageDots"></div>
+            <button type="button" class="wallet-nav-arrow" id="walletNextBtn">›</button>
+          </div>
+          <button type="button" onclick="openTransferCouponModal()"
+            style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; padding:7px 12px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
+            🎁 ส่งของขวัญให้เพื่อน
+          </button>
         </div>
       </div>
 
@@ -458,15 +474,15 @@
 
     <!-- 3. โซนหมวดหมู่และรายการแลกรางวัล / สปอนเซอร์อื่นๆ -->
     <div class="main-tabs-wrapper">
-      <button class="main-tab-btn active" data-tab="all">ทั้งหมด</button>
-      <button class="main-tab-btn" data-tab="sponsor">สปอนเซอร์</button>
+      <button type="button" class="main-tab-btn active" data-tab="all">ทั้งหมด</button>
+      <button type="button" class="main-tab-btn" data-tab="sponsor">สปอนเซอร์</button>
     </div>
 
     <!-- แท็บย่อย (แสดงเฉพาะตอนอยู่แท็บ "ทั้งหมด") -->
     <div id="sub-categories-wrapper" class="sub-categories-container">
-      <button class="sub-tab-btn" data-category="food">อาหาร & เครื่องดื่ม</button>
-      <button class="sub-tab-btn" data-category="equipment">อุปกรณ์</button>
-      <button class="sub-tab-btn" data-category="discount">ส่วนลดสเปเชียล</button>
+      <button type="button" class="sub-tab-btn" data-category="drink">อาหาร &amp; เครื่องดื่ม</button>
+      <button type="button" class="sub-tab-btn" data-category="gear">อุปกรณ์</button>
+      <button type="button" class="sub-tab-btn" data-category="discount">ส่วนลดสเปเชียล</button>
     </div>
     <div id="content-view-container">
     </div>
@@ -477,23 +493,39 @@
      ========================================== -->
   <div id="screen-profile" class="page" style="padding:20px 16px 90px 16px; background:#f9fafb;">
     <h2>👤 โปรไฟล์ผู้ใช้งาน</h2>
+
     <div
       style="background:linear-gradient(135deg, #22c55e 0%, #15803d 100%); border-radius:20px; padding:20px; color:white; margin-bottom:20px; box-shadow:0 4px 15px rgba(34,197,94,0.3); display:flex; align-items:center; gap:16px;">
       <div
-        style="width:60px; height:60px; border-radius:50%; background:#ffffff; color:#15803d; display:flex; justify-content:center; align-items:center; font-size:28px; font-weight:bold; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+        style="width:60px; height:60px; border-radius:50%; background:#ffffff; color:#15803d; display:flex; justify-content:center; align-items:center; font-size:28px; font-weight:bold; box-shadow:0 2px 8px rgba(0,0,0,0.15); flex-shrink:0;">
         🏃</div>
-      <div style="flex:1;">
-        <div style="font-size:18px; font-weight:700;" id="profile-email-display">Jinjung (GSP)</div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="font-size:18px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+            id="profile-email-display">Jinjung (GSP)</div>
+          <button type="button" onclick="openEditDisplayNameModal()" title="แก้ไขชื่อที่แสดง"
+            style="background:rgba(255,255,255,0.22); border:1px solid rgba(255,255,255,0.35); color:#fff; border-radius:8px; padding:2px 8px; font-size:11px; font-weight:600; cursor:pointer; flex-shrink:0;">✏️
+            แก้ชื่อ</button>
+        </div>
         <div style="font-size:12px; opacity:0.9; margin-top:2px;" id="profile-level-display">🔰 เลเวล 3:
           เจ้าเมืองผู้ชำนาญการ</div>
         <div
           style="font-size:11px; background:rgba(255,255,255,0.2); display:inline-block; padding:2px 8px; border-radius:10px; margin-top:6px;"
           id="profile-xp-display">⭐ สะสม 450 / 1,000 XP</div>
+
+        <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span
+            style="font-size:11px; background:rgba(0,0,0,0.22); padding:3px 8px; border-radius:8px; font-family:monospace;"
+            id="profile-userid-display">ID: กำลังโหลด...</span>
+          <button type="button" onclick="copyCurrentUserId()"
+            style="background:#ffffff; color:#15803d; border:none; border-radius:8px; padding:3px 9px; font-size:11px; font-weight:700; cursor:pointer;">📋
+            คัดลอก ID</button>
+        </div>
       </div>
     </div>
 
     <div
-      style="background:#fff; border-radius:16px; padding:16px; margin-bottom:20px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display:flex; justify-content:space-between; align-items:center; border:1px solid #f3f4f6;">
+      style="background:#fff; border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display:flex; justify-content:space-between; align-items:center; border:1px solid #f3f4f6;">
       <div style="display:flex; align-items:center; gap:12px;">
         <div style="font-size:24px;">🪙</div>
         <div>
@@ -501,13 +533,37 @@
           <div id="user-points-val" style="font-size:18px; font-weight:700; color:#1f2937;">250 Points</div>
         </div>
       </div>
-      <button onclick="switchScreen('screen-sponsors')"
+      <button type="button" onclick="switchScreen('screen-sponsors')"
         style="background:#f3f4f6; border:none; padding:8px 14px; border-radius:10px; font-size:12px; font-weight:600; color:#374151; cursor:pointer;">🎁
         แลกรางวัล</button>
     </div>
 
     <div
       style="background:#fff; border-radius:16px; padding:8px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f3f4f6; margin-bottom:16px;">
+      <div onclick="openFriendsModal('friends')"
+        style="display:flex; justify-content:space-between; align-items:center; padding:14px; border-bottom:1px solid #f3f4f6; cursor:pointer;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:18px;">👥</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:14px; font-weight:600; color:#15803d;">เพื่อน &amp; QR ของฉัน</span>
+            <span data-friend-req-badge
+              style="display:none; background:#ef4444; color:#fff; font-size:11px; padding:1px 7px; border-radius:999px;">0</span>
+          </div>
+        </div>
+        <span style="font-size:12px; color:#16a34a; font-weight:600;">จัดการ ›</span>
+      </div>
+      <div onclick="openMerchantRequestModal()"
+        style="display:flex; justify-content:space-between; align-items:center; padding:14px; border-bottom:1px solid #f3f4f6; cursor:pointer;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:18px;">🏪</span>
+          <div>
+            <div style="font-size:14px; font-weight:600; color:#15803d;">สมัครเป็นผู้ประกอบการ / ติดต่อทีมงาน</div>
+            <div style="font-size:11px; color:#9ca3af;">ขอเปิดสิทธิ์ร้านค้า สร้างแคมเปญ และแจ้ง User ID ยืนยันตัวตน
+            </div>
+          </div>
+        </div>
+        <span style="font-size:12px; color:#16a34a; font-weight:600;">สมัคร ›</span>
+      </div>
       <div onclick="openPrivacyZoneModal()"
         style="display:flex; justify-content:space-between; align-items:center; padding:14px; border-bottom:1px solid #f3f4f6; cursor:pointer;">
         <div style="display:flex; align-items:center; gap:12px;">
@@ -519,20 +575,21 @@
         </div>
         <span style="font-size:12px; color:#9ca3af;">ตั้งค่า ›</span>
       </div>
-      <div onclick="openMusicModal()"
+      <div onclick="openMusicWidget()"
         style="display:flex; justify-content:space-between; align-items:center; padding:14px; border-bottom:1px solid #f3f4f6; cursor:pointer;">
         <div style="display:flex; align-items:center; gap:12px;"><span style="font-size:18px;">🎵</span><span
-            style="font-size:14px; font-weight:600; color:#374151;">ตั้งค่าแอปเพลงหลัก</span></div>
-        <span style="font-size:12px; color:#9ca3af;">เปลี่ยน ›</span>
+            style="font-size:14px; font-weight:600; color:#374151;">เปิดเครื่องเล่นเพลง KaoKhet</span></div>
+        <span style="font-size:12px; color:#9ca3af;">เปิด ›</span>
       </div>
-      <div onclick="showHowToPlayModal()"
+      <div onclick="switchScreen('screen-leaderboard')"
         style="display:flex; justify-content:space-between; align-items:center; padding:14px; cursor:pointer;">
         <div style="display:flex; align-items:center; gap:12px;"><span style="font-size:18px;">🗺️</span><span
-            style="font-size:14px; font-weight:600; color:#374151;">คู่มือวิธีเล่นเกมชิงพื้นที่</span></div>
-        <span style="font-size:12px; color:#9ca3af;">อ่าน ›</span>
+            style="font-size:14px; font-weight:600; color:#374151;">สงครามแคลน &amp; อันดับผู้เล่น</span></div>
+        <span style="font-size:12px; color:#9ca3af;">ดู ›</span>
       </div>
     </div>
-    <button onclick="handleLogout()"
+
+    <button type="button" onclick="handleLogout()"
       style="width:100%; padding:12px; background:#ef4444; color:white; border:none; border-radius:12px; font-weight:700; cursor:pointer;">ออกจากระบบ</button>
   </div>
 
@@ -847,10 +904,10 @@
         onchange="handleStudioPhotoUpload(event)" />
 
       <div style="display:flex; flex-direction:column; gap:8px;">
-        <button onclick="document.getElementById('camera-file-input').click()"
+        <button type="button" onclick="document.getElementById('camera-file-input').click()"
           style="padding:12px; background:#3b82f6; color:white; border:none; border-radius:12px; font-weight:700; cursor:pointer;">📷
           เปิดกล้อง / เลือกรูปภาพ</button>
-        <button onclick="closeCameraShortcutModal()"
+        <button type="button" onclick="closeCameraShortcutModal()"
           style="padding:10px; background:#f3f4f6; color:#4b5563; border:none; border-radius:12px; font-weight:600; cursor:pointer;">ปิด</button>
       </div>
     </div>
@@ -866,7 +923,7 @@
         <button type="button" class="kk-studio-btn" onclick="finishActivity()" title="ปิดสตูดิโอ">✕</button>
         <div class="kk-studio-brand-title">
           <strong>KaoKhet Studio</strong>
-          <span>แต่งภาพสถิติ & แชร์</span>
+          <span>แต่งภาพสถิติ &amp; แชร์</span>
         </div>
       </div>
 
@@ -1078,7 +1135,7 @@
       </button>
       <button type="button" class="kk-studio-nav-item"
         onclick="selectStudioCategory('panel-stats', 'เปิด/ปิด โลโก้ เส้นทาง และสถิติ (สูงสุด 4 ค่า)', this)">
-        <span>ข้อมูล & โลโก้</span>
+        <span>ข้อมูล &amp; โลโก้</span>
       </button>
       <button type="button" class="kk-studio-nav-item"
         onclick="selectStudioCategory('panel-stickers', 'เลือกสติกเกอร์ตกแต่ง (ลากย้ายและย่อขยายได้)', this)">
@@ -1102,9 +1159,9 @@
       <p style="font-size:12px; color:#6b7280; margin-bottom:20px;">คุณต้องการลบคูปองนี้ออกจากกระเป๋าใช่หรือไม่?</p>
 
       <div style="display:flex; gap:8px;">
-        <button onclick="closeDeleteCouponModal()"
+        <button type="button" onclick="closeDeleteCouponModal()"
           style="flex:1; padding:10px; background:#f3f4f6; color:#4b5563; border:none; border-radius:10px; font-weight:600; font-size:12px; cursor:pointer;">ยกเลิก</button>
-        <button id="btn-confirm-delete-coupon"
+        <button type="button" id="btn-confirm-delete-coupon"
           style="flex:1; padding:10px; background:#ef4444; color:white; border:none; border-radius:10px; font-weight:700; font-size:12px; cursor:pointer;">ยืนยันลบ</button>
       </div>
     </div>
@@ -1120,28 +1177,44 @@
         style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid #f3f4f6; padding-bottom:12px;">
         <h3 style="font-size:18px; color:#1f2937; font-weight:700; margin:0;">📋 จัดการแคมเปญ</h3>
         <div style="display:flex; gap:8px; align-items:center;">
-          <button onclick="openCreateCampaignForm()"
+          <button type="button" onclick="openCreateCampaignForm('normal')"
             style="background:#22c55e; color:white; border:none; padding:6px 12px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px;">
             <span>➕</span> เพิ่มแคมเปญ
           </button>
-          <button onclick="closeSponsorForm()"
+          <button type="button" onclick="closeSponsorForm()"
             style="background:#f3f4f6; border:none; width:28px; height:28px; border-radius:50%; font-size:16px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center;">&times;</button>
         </div>
       </div>
 
       <div style="overflow-y:auto; flex:1; padding-right:4px;">
         <div id="campaign-list-view">
+          <!-- ทางลัดสร้างแคมเปญแยกตาม 3 ประเภท -->
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:12px;">
+            <button type="button" onclick="openCreateCampaignForm('normal')"
+              style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:8px 6px; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer;">
+              🏷️ แคมเปญปกติ
+            </button>
+            <button type="button" onclick="openCreateCampaignForm('fortress')"
+              style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; padding:8px 6px; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer;">
+              🏰 ป้อมปราการ
+            </button>
+            <button type="button" onclick="openCreateCampaignForm('raid_boss')"
+              style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; padding:8px 6px; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer;">
+              🐲 Raid Boss
+            </button>
+          </div>
+
           <div id="merchant-campaigns-container" style="display:flex; flex-direction:column; gap:10px;">
             <div style="text-align:center; color:#9ca3af; padding:30px 0;">⏳ กำลังโหลดรายการแคมเปญ...</div>
           </div>
         </div>
 
         <div id="campaign-form-view" style="display:none;">
-          <div style="display:flex; align-items:center; justify-content:between; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
             <h4 id="form-mode-title" style="font-size:15px; font-weight:700; color:#374151; margin:0;">✨
               เพิ่มแคมเปญใหม่
             </h4>
-            <button onclick="backToCampaignList()"
+            <button type="button" onclick="backToCampaignList()"
               style="background:none; border:none; color:#3b82f6; font-size:12px; font-weight:600; cursor:pointer;">←
               กลับไปหน้ารายการ</button>
           </div>
@@ -1149,31 +1222,84 @@
           <form id="add-sponsor-form" onsubmit="handleSaveCampaign(event)">
             <input type="hidden" id="editing-campaign-id" value="" />
 
-            <div class="form-group">
-              <label
-                style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">แบนเนอร์ร้านค้า
-                (รูปภาพแนวนอน)</label>
-              <div id="banner-preview-container" onclick="document.getElementById('store-banner-input').click()"
-                style="cursor: pointer; margin-bottom: 8px;">
-                <img id="current-banner-img" src="default-banner.png" alt="Banner Preview"
-                  style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;">
+            <!-- ==========================================
+                 โซนที่ 1: ตัวตนร้านตั้งต้น (เปลี่ยนแปลงน้อย / ดึงค่าอัตโนมัติ)
+                 ========================================== -->
+            <div
+              style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; margin-bottom:14px;">
+              <div
+                style="font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                <span>🏪 ข้อมูลตั้งต้นของร้านค้า</span>
+                <span
+                  style="font-size:10px; font-weight:600; color:#16a34a; background:#dcfce7; padding:2px 8px; border-radius:999px;">ใช้ร่วมทุกแคมเปญ</span>
               </div>
-              <input type="file" id="store-banner-input" accept="image/*" style="display: none;"
-                onchange="uploadStoreBanner(currentUser.id, this)">
-              <small style="font-size: 11px; color: #9ca3af;">คลิกที่รูปภาพเพื่อเลือกและอัปเปลี่ยนแบนเนอร์ใหม่</small>
+
+              <div class="form-group" style="margin-bottom:10px;">
+                <label
+                  style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">แบนเนอร์ร้านค้า
+                  (รูปภาพแนวนอน)</label>
+                <div id="banner-preview-container" onclick="document.getElementById('store-banner-input').click()"
+                  style="cursor: pointer; margin-bottom: 4px;">
+                  <img id="current-banner-img" src="default-banner.png" alt="Banner Preview"
+                    style="width: 100%; height: 110px; object-fit: cover; border-radius: 10px; border:1px solid #e2e8f0;">
+                </div>
+                <input type="file" id="store-banner-input" accept="image/*" style="display: none;"
+                  onchange="uploadStoreBanner(currentUser.id, this)">
+                <small
+                  style="font-size: 11px; color: #64748b;">คลิกที่รูปแบนเนอร์เพื่อเปลี่ยนและอัปเดตโปรไฟล์ร้านทันที</small>
+              </div>
+
+              <div>
+                <label
+                  style="display: block; font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 4px;">🏷️
+                  ชื่อร้านค้า / แบรนด์</label>
+                <input type="text" id="sponsor-merchant-name" placeholder="เช่น ร้านกาแฟบ้านคุณ" class="auth-input"
+                  style="margin-bottom:0; background:#fff;" />
+              </div>
             </div>
 
-            <div style="margin-bottom: 12px;">
-              <label style="display: block; font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 4px;">🏪
-                ชื่อร้านค้า / แบรนด์</label>
-              <input type="text" id="sponsor-merchant-name" placeholder="เช่น ร้านกาแฟบ้านคุณ" class="auth-input" />
+            <!-- ==========================================
+                 โซนที่ 2: ปุ่มกดสลับโหมดแคมเปญ 3 แบบในฟอร์ม
+                 ========================================== -->
+            <div style="margin-bottom:14px;">
+              <label style="font-size:12px; font-weight:800; color:#1f2937; display:block; margin-bottom:6px;">🎯
+                เลือกรูปแบบแคมเปญที่จะเปิด</label>
+              <select id="sponsor-campaign-type" onchange="switchCampaignModeFields(this.value)" style="display:none;">
+                <option value="normal" selected>normal</option>
+                <option value="fortress">fortress</option>
+                <option value="raid_boss">raid_boss</option>
+              </select>
+
+              <div id="campaign-mode-switcher"
+                style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:8px;">
+                <button type="button" id="mode-btn-normal" onclick="selectCampaignModeInForm('normal')"
+                  style="padding:10px 8px; border-radius:12px; border:2px solid #2563eb; background:#eff6ff; color:#1d4ed8; font-size:12px; font-weight:800; cursor:pointer; text-align:center; line-height:1.3;">
+                  🏷️ แคมเปญธรรมดา
+                </button>
+                <button type="button" id="mode-btn-fortress" onclick="selectCampaignModeInForm('fortress')"
+                  style="padding:10px 8px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; color:#4b5563; font-size:12px; font-weight:700; cursor:pointer; text-align:center; line-height:1.3;">
+                  🏰 ป้อมปราการหน้าร้าน
+                </button>
+                <button type="button" id="mode-btn-raid_boss" onclick="selectCampaignModeInForm('raid_boss')"
+                  style="padding:10px 8px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; color:#4b5563; font-size:12px; font-weight:700; cursor:pointer; text-align:center; line-height:1.3;">
+                  🐲 เรดบอส
+                </button>
+              </div>
+
+              <div id="campaign-mode-helper-banner"
+                style="font-size:11.5px; color:#1e40af; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:8px 10px; line-height:1.45;">
+                <strong>แคมเปญธรรมดา:</strong> แสดงหมุดโปรโมชันบนแผนที่พร้อมปุ่มเข้าหน้าร้าน
+                ผู้เล่นใช้พอยต์แลกคูปองทั่วไปได้ทันที
+              </div>
             </div>
 
+            <!-- ==========================================
+                 โซนที่ 3: รายละเอียดแคมเปญและพิกัดปักหมุดบนแผนที่
+                 ========================================== -->
             <div style="margin-bottom:12px;">
               <label
                 style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">ชื่อแคมเปญ
-                /
-                ส่วนลด</label>
+                / ส่วนลด</label>
               <input type="text" id="sponsor-title" placeholder="เช่น ส่วนลด 50 บาท กาแฟเครื่องดื่ม" class="auth-input"
                 required />
             </div>
@@ -1183,7 +1309,7 @@
                 style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">หมวดหมู่</label>
               <select id="sponsor-category" class="auth-input"
                 style="width:100%; padding:10px; border-radius:12px; border:1px solid #e5e7eb;" required>
-                <option value="drink">☕ อาหาร & เครื่องดื่ม</option>
+                <option value="drink">☕ อาหาร &amp; เครื่องดื่ม</option>
                 <option value="gear">👟 อุปกรณ์วิ่ง</option>
                 <option value="discount">🏷️ ส่วนลดสเปเชียล</option>
               </select>
@@ -1197,12 +1323,20 @@
                 class="auth-input" required />
             </div>
 
-            <div style="margin-bottom:12px;">
-              <label
-                style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">พอยต์ที่ใช้แลก
-                (Points Cost)</label>
-              <input type="number" id="sponsor-points-cost" class="auth-input" style="padding:8px;" value="50" min="0"
-                required />
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+              <div>
+                <label
+                  style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">พอยต์ที่ใช้แลก
+                  (Points)</label>
+                <input type="number" id="sponsor-points-cost" class="auth-input" style="padding:8px; margin-bottom:0;"
+                  value="50" min="0" required />
+              </div>
+              <div>
+                <label
+                  style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">จำนวนสิทธิ์ทั้งหมด</label>
+                <input type="number" id="sponsor-total-limit" class="auth-input" style="padding:8px; margin-bottom:0;"
+                  value="10" min="1" required />
+              </div>
             </div>
 
             <div style="margin-bottom:12px;">
@@ -1210,14 +1344,6 @@
                 style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">รูปภาพแคมเปญ</label>
               <input type="file" id="sponsor-image-file" accept="image/*" class="auth-input"
                 style="padding:8px; background:#f9fafb;" />
-            </div>
-
-            <div style="margin-bottom:12px;">
-              <label
-                style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">จำนวนสิทธิ์ทั้งหมด
-                (จำกัดสิทธิ์)</label>
-              <input type="number" id="sponsor-total-limit" class="auth-input" style="padding:8px;" value="10" min="1"
-                required />
             </div>
 
             <div style="display:flex; gap:8px; margin-bottom:12px;">
@@ -1233,18 +1359,21 @@
               </div>
             </div>
 
-            <div style="margin-bottom:16px;">
+            <div style="margin-bottom:14px;">
               <label
                 style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">คำอธิบายเพิ่มเติม</label>
               <textarea id="sponsor-desc" placeholder="เงื่อนไขการใช้งานคูปอง..." class="auth-input"
                 style="height:60px; resize:none;"></textarea>
             </div>
 
-            <!-- 📍 โซนตั้งค่าพิกัดป้อมปราการสปอนเซอร์ พร้อมมินิแมพ -->
-            <div
+            <!-- 📍 โซนปักหมุดพิกัดกิจกรรมบนแผนที่ (ใช้ได้ทั้ง 3 โหมด โดยดึงพิกัดร้านตั้งต้นให้อัตโนมัติ) -->
+            <div id="campaign-location-section"
               style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
-              <label style="display: block; font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">📍
-                พิกัดป้อมปราการร้านค้าบนแผนที่ (Sponsor Node)</label>
+              <label style="display: block; font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">📍
+                พิกัดปักหมุดกิจกรรมบนแผนที่ (ทั้ง 3 โหมด)</label>
+              <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">
+                ระบบดึงพิกัดร้านตั้งต้นให้โดยอัตโนมัติ เพื่อให้ผู้เล่นกดเข้าหน้าร้านจากหมุดบนแผนที่ได้
+              </div>
 
               <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                 <input type="number" step="any" id="sponsor-lat" placeholder="Latitude" class="auth-input"
@@ -1253,71 +1382,96 @@
                   style="margin-bottom:0;" readonly />
               </div>
 
-              <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <button type="button" onclick="applyStoreDefaultLocation(true)"
+                  style="flex: 1; padding: 8px 6px; background: #10b981; color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer;">🏪
+                  พิกัดร้านตั้งต้น</button>
                 <button type="button" onclick="getCurrentLocationForSponsor()"
-                  style="flex: 1; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer;">📍
-                  ตำแหน่งปัจจุบันของฉัน</button>
-                <button type="button" onclick="resetMerchantMiniMap()"
-                  style="padding: 8px 12px; background: #e5e7eb; color: #374151; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer;">🔄
-                  รีเซ็ตหมุด</button>
+                  style="flex: 1; padding: 8px 6px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer;">📍
+                  ตำแหน่งปัจจุบัน</button>
+                <button type="button" onclick="applyStoreDefaultLocation(true)"
+                  style="padding: 8px 10px; background: #e5e7eb; color: #374151; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer;">🔄</button>
               </div>
 
-              <!-- 🗺️ ส่วนแสดงมินิแมพสำหรับจิ้มเลือกพิกัด -->
+              <!-- 🗺️ มินิแมพสำหรับจิ้มเลือกพิกัด -->
               <div id="merchant-mini-map"
-                style="width: 100%; height: 180px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 8px; z-index: 10;">
+                style="width: 100%; height: 180px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 6px; z-index: 10;">
               </div>
-              <div style="font-size: 10px; color: #64748b; text-align: center; margin-bottom: 8px;">💡 เคล็ดลับ:
-                คลิกบนแผนที่เพื่อย้ายหมุดไปยังตำแหน่งหน้าร้านของคุณได้ทันที</div>
+              <div style="font-size: 10px; color: #64748b; text-align: center;">💡
+                คลิกบนแผนที่เพื่อย้ายหมุดไปยังตำแหน่งที่ต้องการได้ทันที</div>
+            </div>
 
-              <div style="display: flex; gap: 12px; align-items: center;">
-                <div style="flex: 1;">
-                  <label style="font-size: 11px; color: #475569; display: block; margin-bottom: 2px;">รัศมีเช็กอิน
+            <!-- ==========================================
+                 โซนที่ 4: ช่องกรอกเฉพาะโหมด (สลับแสดงตามโหมดที่กด)
+                 ========================================== -->
+
+            <!-- 🏰 จุดเช็กอินและรัศมี (ป้อมปราการหน้าร้าน / เรดบอส) -->
+            <div id="fortress-node-fields"
+              style="display: none; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+              <div style="font-size: 12px; font-weight: 800; color: #92400e; margin-bottom: 8px;">🏰
+                ตั้งค่าจุดเช็กอินและรัศมี (ป้อมปราการ / เรดบอส)</div>
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 120px;">
+                  <label style="font-size: 11px; color: #78350f; display: block; margin-bottom: 2px;">รัศมีเช็กอิน
                     (เมตร)</label>
-                  <input type="number" id="sponsor-radius" value="50" class="auth-input"
-                    style="margin-bottom:0; padding:6px;" />
+                  <input type="number" id="sponsor-radius" value="50" min="10" class="auth-input"
+                    style="margin-bottom:0; padding:6px; background:#fff;" />
                 </div>
-                <div style="flex: 1; display: flex; align-items: center; gap: 6px; padding-top: 16px;">
+                <div id="secret-node-option-row"
+                  style="flex: 1; min-width: 160px; display: flex; align-items: center; gap: 6px; padding-top: 16px;">
                   <input type="checkbox" id="sponsor-is-secret" style="width: 16px; height: 16px; cursor: pointer;" />
                   <label for="sponsor-is-secret"
-                    style="font-size: 11px; font-weight: 600; color: #d97706; cursor: pointer;">🥷 คูปองลับ
+                    style="font-size: 11px; font-weight: 600; color: #b45309; cursor: pointer;">🥷 คูปองลับ
                     (เฉพาะคนเดินมาถึงหน้าร้าน)</label>
                 </div>
               </div>
             </div>
 
-            <!-- 🐲 ส่วนตั้งค่ากิจกรรม Boss Map (เรดบอสประจำแมพ) -->
-            <div
-              style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+            <!-- 🐲 เฉพาะโหมด: เรดบอส (Boss Map) -->
+            <div id="raid-boss-fields-wrapper"
+              style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <input type="checkbox" id="sponsor-is-raid" onchange="toggleRaidBossFields()"
-                  style="width: 18px; height: 18px; cursor: pointer;" />
-                <label for="sponsor-is-raid"
-                  style="font-size: 13px; font-weight: 700; color: #dc2626; cursor: pointer;">🐲 เปิดใช้งานกิจกรรม
-                  Boss
-                  Map (เรดบอสสะสมระยะทาง)</label>
+                <input type="checkbox" id="sponsor-is-raid" checked style="display:none;" />
+                <span style="font-size: 13px; font-weight: 800; color: #dc2626;">🐲
+                  ตั้งค่ากิจกรรมเรดบอสสะสมระยะทาง</span>
               </div>
 
-              <!-- บล็อกที่จะแสดงผลก็ต่อเมื่อติ๊กเปิดใช้งาน Boss Map -->
               <div id="raid-boss-fields"
-                style="display: none; flex-direction: column; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #fca5a5;">
+                style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding-top: 8px; border-top: 1px dashed #fca5a5;">
                 <div>
                   <label
                     style="font-size: 11px; font-weight: 600; color: #7f1d1d; display: block; margin-bottom: 2px;">ชื่อตัวบอส
                     / กิจกรรม</label>
-                  <input type="text" id="sponsor-boss-name" placeholder="เช่น บอสมังกรไฟแห่งพิกัด (HP/EXP 10,000 กม.)"
+                  <input type="text" id="sponsor-boss-name" placeholder="เช่น บอสประจำโซน (เป้า 10 กม.)"
                     class="auth-input" style="margin-bottom:0; background:#fff;" />
                 </div>
-                <div>
-                  <label
-                    style="font-size: 11px; font-weight: 600; color: #7f1d1d; display: block; margin-bottom: 2px;">ระยะทางเป้าหมายรวม
-                    (กิโลเมตร) สำหรับใช้แทนค่า HP/EXP บอส</label>
-                  <input type="number" id="sponsor-target-dist" value="500" class="auth-input"
-                    style="margin-bottom:0; background:#fff;" />
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
+                  <div>
+                    <label
+                      style="font-size: 11px; font-weight: 600; color: #7f1d1d; display: block; margin-bottom: 2px;">เป้าบอส
+                      (กม.)</label>
+                    <input type="number" step="0.1" min="0.5" id="sponsor-target-dist" value="10" class="auth-input"
+                      style="margin-bottom:0; background:#fff; padding:8px;" />
+                  </div>
+                  <div>
+                    <label
+                      style="font-size: 11px; font-weight: 600; color: #7f1d1d; display: block; margin-bottom: 2px;">ขั้นต่ำผู้เล่น
+                      (กม.)</label>
+                    <input type="number" step="0.1" min="0" id="sponsor-min-dist" value="1" class="auth-input"
+                      style="margin-bottom:0; background:#fff; padding:8px;" />
+                  </div>
+                  <div>
+                    <label
+                      style="font-size: 11px; font-weight: 600; color: #7f1d1d; display: block; margin-bottom: 2px;">เวลารับสิทธิ์
+                      (ชม.)</label>
+                    <input type="number" min="1" id="sponsor-claim-hours" value="2" class="auth-input"
+                      style="margin-bottom:0; background:#fff; padding:8px;" />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div style="display:flex; gap:8px;">
+            <div style="display:flex; gap:8px; margin-top:14px;">
               <button type="button" onclick="backToCampaignList()"
                 style="flex:1; padding:10px; background:#f3f4f6; color:#4b5563; border:none; border-radius:10px; font-weight:600; cursor:pointer;">ยกเลิก</button>
               <button type="submit"
@@ -1344,7 +1498,7 @@
             ประวัติและการตรวจสอบคูปองทั้งหมด
           </h3>
         </div>
-        <button onclick="closeMerchantHistoryModal()"
+        <button type="button" onclick="closeMerchantHistoryModal()"
           style="background:rgba(255,255,255,0.1); border:none; color:#cbd5e1; width:30px; height:30px; border-radius:50%; font-size:18px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center;">&times;</button>
       </div>
 
@@ -1371,7 +1525,7 @@
 
       <div
         style="background:#f8fafc; padding:12px 20px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end;">
-        <button onclick="closeMerchantHistoryModal()"
+        <button type="button" onclick="closeMerchantHistoryModal()"
           style="background:#334155; color:white; border:none; padding:8px 20px; border-radius:10px; font-weight:600; cursor:pointer; font-size:13px;">ปิดหน้าต่าง</button>
       </div>
 
@@ -1386,7 +1540,7 @@
       <div
         style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid #f3f4f6; padding-bottom:12px;">
         <h3 style="font-size:16px; color:#1f2937; font-weight:700; margin:0;">🔔 แจ้งเตือนของคุณ</h3>
-        <button onclick="closeNotificationsModal()"
+        <button type="button" onclick="closeNotificationsModal()"
           style="background:#f3f4f6; border:none; width:28px; height:28px; border-radius:50%; font-size:16px; font-weight:bold; cursor:pointer;">&times;</button>
       </div>
 
@@ -1397,6 +1551,74 @@
     </div>
   </div>
 
+  <!-- 🛡️ Modal ตั้งค่า Privacy Zone (พื้นที่ส่วนตัว) -->
+  <div id="privacy-zone-modal"
+    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:3600; align-items:center; justify-content:center; padding:18px; backdrop-filter:blur(4px);">
+    <div
+      style="background:#fff; border-radius:24px; padding:22px; max-width:390px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 45px rgba(0,0,0,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="font-size:17px; font-weight:800; color:#1f2937; margin:0;">🛡️ ตั้งค่า Privacy Zone</h3>
+        <button type="button" onclick="closePrivacyZoneModal()"
+          style="background:#f3f4f6; border:none; width:30px; height:30px; border-radius:50%; font-size:15px; font-weight:bold; cursor:pointer;">✕</button>
+      </div>
+
+      <p style="font-size:12px; color:#6b7280; margin:0 0 14px 0; line-height:1.5;">
+        กำหนดจุดพื้นที่ส่วนตัว (เช่น บ้านหรือที่ทำงาน) เพื่อซ่อน/กรองจุดพิกัดในรัศมีที่เลือกและแสดงขอบเขตบนแผนที่
+      </p>
+
+      <label
+        style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:11px 12px; margin-bottom:12px; cursor:pointer;">
+        <span style="font-size:13px; font-weight:700; color:#1f2937;">เปิดใช้งาน Privacy Zone</span>
+        <input type="checkbox" id="pz-enabled-input"
+          style="width:18px; height:18px; accent-color:#7c3aed; cursor:pointer;" />
+      </label>
+
+      <div style="margin-bottom:12px;">
+        <label
+          style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">ชื่อโซนส่วนตัว</label>
+        <input type="text" id="pz-label-input" class="auth-input" placeholder="เช่น บ้านของฉัน" maxlength="40"
+          style="margin-bottom:0;" />
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+        <div>
+          <label style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">ละติจูด
+            (Lat)</label>
+          <input type="number" step="any" id="pz-lat-input" class="auth-input" placeholder="13.7367"
+            style="margin-bottom:0; padding:9px;" />
+        </div>
+        <div>
+          <label style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">ลองจิจูด
+            (Lng)</label>
+          <input type="number" step="any" id="pz-lng-input" class="auth-input" placeholder="100.5231"
+            style="margin-bottom:0; padding:9px;" />
+        </div>
+      </div>
+
+      <button type="button" onclick="fillPrivacyZoneWithCurrentGps()"
+        style="width:100%; padding:9px 12px; margin-bottom:12px; background:#f3e8ff; color:#6d28d9; border:1px solid #ddd6fe; border-radius:11px; font-size:12px; font-weight:700; cursor:pointer;">
+        📍 ดึงพิกัดตำแหน่งปัจจุบันใส่ช่องอัตโนมัติ
+      </button>
+
+      <div style="margin-bottom:16px;">
+        <label
+          style="font-size:12px; font-weight:700; color:#374151; display:block; margin-bottom:4px;">รัศมีพื้นที่ส่วนตัว
+          (เมตร)</label>
+        <input type="number" id="pz-radius-input" class="auth-input" min="20" max="2000" step="10" value="150"
+          style="margin-bottom:0; padding:9px;" />
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button type="button" onclick="closePrivacyZoneModal()"
+          style="flex:1; padding:11px; background:#f3f4f6; color:#4b5563; border:none; border-radius:12px; font-weight:700; cursor:pointer;">ยกเลิก</button>
+        <button type="button" onclick="submitPrivacyZoneForm()"
+          style="flex:1.4; padding:11px; background:#7c3aed; color:#fff; border:none; border-radius:12px; font-weight:700; cursor:pointer;">บันทึกการตั้งค่า</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="privacyZoneModule.js"></script>
+  <script src="fogGhostModule.js"></script>
   <script src="app.js"></script>
   <script src="clanModule.js"></script>
   <script src="shopService.js"></script>
@@ -1406,6 +1628,8 @@
   <script src="merchantModule.js"></script>
   <script src="notificationModule.js"></script>
   <script src="photoModule.js"></script>
+  <script src="profileModule.js"></script>
+  <script src="friendModule.js"></script>
 </body>
 
 </html>

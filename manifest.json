@@ -1,0 +1,23 @@
+{
+    "name": "KaoKhet - ก้าวเขต",
+    "short_name": "KaoKhet",
+    "description": "เว็บแอปติดตามกิจกรรมการออกกำลังกาย ภารกิจพื้นที่ คอมมูนิตี้ และสิทธิพิเศษร้านค้า",
+    "start_url": "./index.html",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#091526",
+    "theme_color": "#091526",
+    "icons": [
+        {
+            "src": "./icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "./icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

@@ -46,10 +46,12 @@ function closeTopLayer(modalId) {
 // ==========================================
 // 🔐 ระบบล็อกอิน & โปรไฟล์ผู้ใช้จริง (Supabase Auth)
 // ==========================================
+
 async function handleAuthLogin(e) {
   e.preventDefault();
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-password').value.trim();
+  const email = document.getElementById('auth-email')?.value.trim() || '';
+  const password = document.getElementById('auth-password')?.value.trim() || '';
+  const rawDisplayName = document.getElementById('auth-display-name')?.value.trim() || '';
 
   if (!supabaseClient) {
     showToast('❌ ไม่พบการเชื่อมต่อฐานข้อมูล Supabase');
@@ -57,22 +59,97 @@ async function handleAuthLogin(e) {
   }
 
   try {
-    let { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) {
-      let signUpRes = await supabaseClient.auth.signUp({ email, password });
-      if (signUpRes.error) {
-        showToast('❌ ล็อกอินไม่สำเร็จ: ' + signUpRes.error.message);
-        return;
-      }
-      data = signUpRes;
+    let { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (!signInError && signInData?.user) {
+      await initUserProfile(signInData.user, rawDisplayName);
+      loginSuccess(signInData.user.email);
+      return;
     }
 
-    if (data?.user) {
-      await initUserProfile(data.user);
-      loginSuccess(data.user.email);
+    const signUpPayload = { email, password };
+    if (rawDisplayName) {
+      signUpPayload.options = {
+        data: { display_name: rawDisplayName }
+      };
+    }
+
+    const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp(signUpPayload);
+    if (signUpError) {
+      showToast('❌ ล็อกอินหรือสมัครสมาชิกไม่สำเร็จ: ' + signUpError.message);
+      return;
+    }
+
+    if (signUpData?.user && signUpData?.session) {
+      await initUserProfile(signUpData.user, rawDisplayName);
+      loginSuccess(signUpData.user.email);
+    } else if (signUpData?.user) {
+      showToast('📩 สมัครสมาชิกแล้ว กรุณายืนยันอีเมลก่อนเข้าสู่ระบบครับ');
     }
   } catch (err) {
     showToast('❌ เกิดข้อผิดพลาดในการเชื่อมต่อระบบสมาชิก');
+  }
+}
+
+async function initUserProfile(user, preferredDisplayName = '') {
+  currentUser = user;
+
+  const { data } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const resolvedName =
+    (preferredDisplayName || '').trim() ||
+    user.user_metadata?.display_name ||
+    data?.display_name ||
+    (user.email ? user.email.split('@')[0] : 'ผู้ใช้งาน');
+
+  if (!data) {
+    const newProfile = {
+      id: user.id,
+      email: user.email ?? null,
+      display_name: resolvedName,
+      clan: 'none',
+      points: 0,
+      xp: 0,
+      level: 1
+    };
+    const { data: inserted } = await supabaseClient
+      .from('profiles')
+      .upsert(newProfile, { onConflict: 'id' })
+      .select()
+      .maybeSingle();
+    currentProfile = inserted || newProfile;
+  } else {
+    currentProfile = data;
+    if ((preferredDisplayName || '').trim() && !data.display_name) {
+      await supabaseClient
+        .from('profiles')
+        .update({ display_name: preferredDisplayName.trim() })
+        .eq('id', user.id);
+      currentProfile.display_name = preferredDisplayName.trim();
+    }
+  }
+
+  if (typeof initClanSystem === 'function') {
+    await initClanSystem();
+  }
+  updateProfileUI();
+  if (typeof loadMyCoupons === 'function') {
+    await loadMyCoupons(currentUser?.id);
+  }
+
+  updateProfileUI();
+  if (typeof loadMyCoupons === 'function') {
+    await loadMyCoupons(currentUser?.id);
+  }
+  if (typeof loadPrivacyZoneFromSupabase === 'function') {
+    await loadPrivacyZoneFromSupabase();
   }
 }
 
@@ -93,42 +170,7 @@ async function restoreSessionOnLoad() {
   }
 }
 
-async function initUserProfile(user) {
-  currentUser = user;
-  const { data, error } = await supabaseClient
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
-  if (error || !data) {
-    const newProfile = {
-      id: user.id,
-      email: user.email,
-      clan: 'none',
-      points: 0,
-      xp: 0,
-      level: 1
-    };
-    await supabaseClient.from('profiles').insert([newProfile]);
-    currentProfile = newProfile;
-  } else {
-    currentProfile = data;
-  }
-
-  if (typeof initClanSystem === 'function') {
-    await initClanSystem();
-  }
-  updateProfileUI();
-  if (typeof loadMyCoupons === 'function') {
-    await loadMyCoupons(currentUser?.id);
-  }
-}
-
 function updateProfileUI() {
-  const emailDisplay = document.getElementById('profile-email-display');
-  if (emailDisplay && currentUser) emailDisplay.textContent = currentUser.email;
-
   const lvlEl = document.getElementById('profile-level-display');
   const xpEl = document.getElementById('profile-xp-display');
   const pointsEl = document.getElementById('user-points-val');
@@ -137,28 +179,72 @@ function updateProfileUI() {
 
   if (lvlEl) lvlEl.textContent = `🔰 เลเวล ${currentProfile.level}: เจ้าเมืองผู้ชำนาญการ`;
   if (xpEl) xpEl.textContent = `⭐ สะสม ${currentProfile.xp} / ${currentProfile.level * 200} XP`;
-  if (pointsEl) pointsEl.textContent = `${currentProfile.points.toLocaleString()} Points`;
-  if (sponsorPointsEl) sponsorPointsEl.textContent = `${currentProfile.points.toLocaleString()} Points`;
-  if (detailPoints) detailPoints.textContent = `${currentProfile.points.toLocaleString()} คะแนน`;
+  if (pointsEl) pointsEl.textContent = `${(currentProfile.points || 0).toLocaleString()} Points`;
+  if (sponsorPointsEl) sponsorPointsEl.textContent = `${(currentProfile.points || 0).toLocaleString()} Points`;
+  if (detailPoints) detailPoints.textContent = `${(currentProfile.points || 0).toLocaleString()} คะแนน`;
+
+  if (typeof loadProfileModuleData === 'function') {
+    loadProfileModuleData();
+  }
 
   if (typeof syncUserClanSummaryBanner === 'function') {
     syncUserClanSummaryBanner();
   }
 }
 
-function loginSuccess(email) {
-  document.getElementById('screen-auth').style.display = 'none';
-  document.getElementById('screen-map').classList.add('active');
+function loginSuccess(emailOrName) {
+  const authScreen = document.getElementById('screen-auth');
+  const mapScreen = document.getElementById('screen-map');
+  if (authScreen) {
+    authScreen.style.display = 'none';
+    authScreen.classList.remove('active');
+  }
+  if (mapScreen) {
+    mapScreen.style.display = '';
+    mapScreen.classList.add('active');
+  }
+
   initMap();
-  showToast(`🎉 ยินดีต้อนรับคุณ ${email}`);
+  if (typeof loadProfileModuleData === 'function') {
+    loadProfileModuleData();
+  }
+
+  const label = currentProfile?.display_name || emailOrName || 'ผู้ใช้งาน';
+  showToast(`🎉 ยินดีต้อนรับคุณ ${label}`);
   checkTerritoryDefenseAlert();
 }
 
-function handleLogout() {
+async function handleLogout() {
   currentUser = null;
-  if (supabaseClient) supabaseClient.auth.signOut();
-  document.getElementById('screen-auth').style.display = 'flex';
-  document.getElementById('screen-map').classList.remove('active');
+  currentProfile = {
+    clan: currentClan,
+    points: 0,
+    xp: 0,
+    level: 1
+  };
+
+  if (sponsorRealtimeChannel && supabaseClient && typeof supabaseClient.removeChannel === 'function') {
+    try {
+      await supabaseClient.removeChannel(sponsorRealtimeChannel);
+    } catch (_) { }
+    sponsorRealtimeChannel = null;
+  }
+
+  if (supabaseClient && supabaseClient.auth) {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (_) { }
+  }
+
+  const authScreen = document.getElementById('screen-auth');
+  const mapScreen = document.getElementById('screen-map');
+  if (mapScreen) {
+    mapScreen.classList.remove('active');
+  }
+  if (authScreen) {
+    authScreen.style.display = 'flex';
+    authScreen.classList.add('active');
+  }
 }
 
 function showToast(msg) {
@@ -231,9 +317,7 @@ function initBottomSheetGestures() {
       const diff = touchStartY - touchEndY;
       if (Math.abs(diff) < 25) return;
 
-      // ถ้าแผงขยายอยู่ และผู้ใช้พยายามปัดลง
       if (isSheetExpanded && diff < -30) {
-        // อนุญาตให้ปิดแผงได้ก็ต่อเมื่อแตะลากที่แฮนด์ดึง หรือเนื้อหาด้านในเลื่อนขึ้นไปอยู่ที่จุดบนสุด (scrollTop === 0) แล้วเท่านั้น
         const isTouchingHandle = handle && handle.contains(e.target);
         const isAtTop = detailsContainer ? detailsContainer.scrollTop === 0 : true;
 
@@ -268,7 +352,8 @@ function executeSideMode(mode) {
   } else if (mode === 'boss') {
     filterMapTerritories('boss');
   } else if (mode === 'code') {
-    showToast('📱 โหมดโค้ด: เปิดใช้งานโหมดสแกน/กรอกโค้ด');
+    switchScreen('screen-sponsors');
+    showToast('📱 เปิดหน้าตรวจสอบ/สแกนโค้ดคูปอง');
   }
 }
 
@@ -331,9 +416,15 @@ let userMarker = null;
 
 let territoryLayerGroup = null;
 let landmarkLayerGroup = null;
+let sponsorNodesLayerGroup = null;
 let ghostPolyline = null;
 let isGhostModeActive = false;
-let isFogActive = false;
+
+// สถานะสำหรับ Supabase Realtime และการรักษาป๊อปอัปที่เปิดอยู่
+let sponsorRealtimeChannel = null;
+let sponsorRealtimeDebounceTimer = null;
+let activeSponsorPopupKey = null;
+let currentSponsorFilterType = 'all';
 
 window.getTotalStats = () => ({ distance: totalDistance, steps: steps });
 
@@ -347,9 +438,10 @@ function initMap() {
     attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
-  loadCapturedTerritories();
+  loadCapturedTerritories('all');
   renderStrategicLandmarks();
-  loadSponsorNodesOnMap();
+  loadSponsorNodesOnMap('all');
+  subscribeSponsorNodesRealtime('all');
   setTimeout(() => map.invalidateSize(), 150);
 }
 
@@ -384,6 +476,16 @@ function formatTime(seconds) {
   return `${m}:${s}`;
 }
 
+function computePaceText(distKm, elapsedSec) {
+  if (distKm > 0.01 && elapsedSec > 0) {
+    const paceTotalSec = elapsedSec / distKm;
+    const paceMin = Math.floor(paceTotalSec / 60);
+    const paceSec = Math.floor(paceTotalSec % 60).toString().padStart(2, '0');
+    return `${paceMin}:${paceSec} min/km`;
+  }
+  return '— min/km';
+}
+
 function updateStats() {
   const distNumberText = totalDistance.toFixed(2);
   const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
@@ -392,14 +494,7 @@ function updateStats() {
   const avgSpeed = elapsed > 0 && totalDistance > 0
     ? `${(totalDistance / (elapsed / 3600)).toFixed(1)} กม./ชม.`
     : '— กม./ชม.';
-
-  let paceText = '— min/km';
-  if (totalDistance > 0.01 && elapsed > 0) {
-    const paceTotalSec = elapsed / totalDistance;
-    const paceMin = Math.floor(paceTotalSec / 60);
-    const paceSec = Math.floor(paceTotalSec % 60).toString().padStart(2, '0');
-    paceText = `${paceMin}:${paceSec} min/km`;
-  }
+  const paceText = computePaceText(totalDistance, elapsed);
   const cadenceVal = elapsed > 0 ? Math.round((steps / elapsed) * 60) : 0;
 
   const statDistEl = document.getElementById('stat-distance');
@@ -472,7 +567,6 @@ function startTracking() {
 
 function processNewCoordinate(lat, lng) {
   updateUserMarker(lat, lng);
-  checkSponsorNodesProximity(lat, lng);
   const currentLatLng = [lat, lng];
 
   if (!startingPoint) {
@@ -512,32 +606,58 @@ function processNewCoordinate(lat, lng) {
   map.setView(currentLatLng, map.getZoom());
 }
 
-async function checkSponsorNodesProximity(userLat, userLng) {
-  if (!supabaseClient || !currentUser) return;
+async function contributeDistanceToRaidBoss(distKm) {
+  if (!supabaseClient || !currentUser || !(distKm > 0)) return;
 
   try {
-    const { data: campaigns } = await supabaseClient
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const { data: raidBosses, error } = await supabaseClient
       .from('campaigns')
-      .select('id, title, lat, lng, node_radius, is_secret_node, reward_details')
-      .not('lat', 'is', null)
-      .not('lng', 'is', null);
+      .select('id, title, boss_name, current_distance_km, target_distance_km, min_distance_km, checked_in_at, defeated_at, is_raid_boss, campaign_type, is_active')
+      .eq('is_active', true)
+      .or('is_raid_boss.eq.true,campaign_type.eq.raid_boss');
 
-    if (!campaigns) return;
+    if (error || !raidBosses || raidBosses.length === 0) return;
 
-    campaigns.forEach(async camp => {
-      const distanceMeters = map.distance([userLat, userLng], [camp.lat, camp.lng]);
-      const radius = camp.node_radius || 50;
+    for (const boss of raidBosses) {
+      const checkedKey = `checked_node_${currentUser.id}_${boss.id}_${todayKey}`;
+      const hasCheckedIn = Boolean(localStorage.getItem(checkedKey)) || Boolean(boss.checked_in_at);
+      if (!hasCheckedIn) continue;
 
-      if (distanceMeters <= radius) {
-        const cacheKey = `checked_node_${currentUser.id}_${camp.id}`;
-        if (localStorage.getItem(cacheKey)) return;
+      const targetKm = Number(boss.target_distance_km) > 0 ? Number(boss.target_distance_km) : 10;
+      const currentKm = Number(boss.current_distance_km) || 0;
+      if (currentKm >= targetKm) continue;
 
-        localStorage.setItem(cacheKey, 'true');
-        showToast(`🎉 คุณเดินมาถึงป้อมปราการ "${camp.title}" แล้ว! ปลดล็อกสิทธิ์พิเศษสำเร็จ!`);
+      const nextKm = Number(Math.min(targetKm, currentKm + distKm).toFixed(3));
+      const isNowDefeated = nextKm >= targetKm;
+      const updatePayload = { current_distance_km: nextKm };
+      if (isNowDefeated && !boss.defeated_at) {
+        updatePayload.defeated_at = new Date().toISOString();
       }
-    });
+
+      const { error: updateErr } = await supabaseClient
+        .from('campaigns')
+        .update(updatePayload)
+        .eq('id', boss.id);
+
+      if (!updateErr) {
+        const playerContribKey = `raid_contrib_${currentUser.id}_${boss.id}_${todayKey}`;
+        const prevPlayerKm = Number(localStorage.getItem(playerContribKey) || 0);
+        localStorage.setItem(playerContribKey, (prevPlayerKm + distKm).toFixed(3));
+
+        const bossLabel = boss.boss_name || boss.title || 'บอสประจำแมพ';
+        if (isNowDefeated) {
+          if (!boss.defeated_at) {
+            await recordCampaignDefeatedTimestamp(boss.id);
+          }
+          showToast(`🏆 ร่วมพิชิต "${bossLabel}" สำเร็จครบ ${targetKm} กม. แล้ว!`);
+        } else {
+          showToast(`⚔️ โจมตี "${bossLabel}" +${distKm.toFixed(2)} กม. (${nextKm.toFixed(1)}/${targetKm} กม.)`);
+        }
+      }
+    }
   } catch (err) {
-    console.error('Error checking proximity:', err);
+    console.error('Error updating raid boss distance:', err);
   }
 }
 
@@ -585,28 +705,53 @@ function toggleGhostMode() {
   }
 }
 
-function toggleFogOfWar() {
-  isFogActive = !isFogActive;
-  showToast(isFogActive ? '🌫️ เปิดใช้งานหมอกสำรวจพื้นที่' : 'ปิดหมอกสำรวจ');
+function filterMapTerritories(type) {
+  const filterType = type || 'all';
+  if (filterType === 'mine') {
+    loadCapturedTerritories('mine');
+    if (sponsorNodesLayerGroup && map) map.removeLayer(sponsorNodesLayerGroup);
+    showToast('👤 กำลังแสดงพื้นที่ยึดครองของคุณ');
+  } else if (filterType === 'sponsors') {
+    if (territoryLayerGroup && map) map.removeLayer(territoryLayerGroup);
+    loadSponsorNodesOnMap('sponsors');
+    subscribeSponsorNodesRealtime('sponsors');
+    showToast('🏪 กำลังแสดงป้อมปราการร้านค้าและสปอนเซอร์');
+  } else if (filterType === 'boss') {
+    if (territoryLayerGroup && map) map.removeLayer(territoryLayerGroup);
+    loadSponsorNodesOnMap('boss');
+    subscribeSponsorNodesRealtime('boss');
+    showToast('👑 กำลังแสดงจุด Raid Boss บนแผนที่');
+  } else {
+    loadCapturedTerritories('all');
+    loadSponsorNodesOnMap('all');
+    subscribeSponsorNodesRealtime('all');
+    showToast('🗺️ กำลังแสดงแผนที่ทั้งหมด');
+  }
 }
 
-function filterMapTerritories(type) { showToast('🌐 ตัวกรองแผนที่: ' + type); }
-
-async function loadCapturedTerritories() {
+async function loadCapturedTerritories(filterMode = 'all') {
   if (!map || !supabaseClient) return;
 
   if (!territoryLayerGroup) {
-    territoryLayerGroup = L.layerGroup().addTo(map);
+    territoryLayerGroup = L.layerGroup();
   } else {
     territoryLayerGroup.clearLayers();
   }
+  if (!map.hasLayer(territoryLayerGroup)) {
+    territoryLayerGroup.addTo(map);
+  }
 
   try {
-    const { data: territories, error } = await supabaseClient
+    let query = supabaseClient
       .from('journeys')
       .select('*')
       .eq('is_captured', true);
 
+    if (filterMode === 'mine' && currentUser?.id) {
+      query = query.eq('user_id', currentUser.id);
+    }
+
+    const { data: territories, error } = await query;
     if (error || !territories) return;
 
     territories.forEach((item) => {
@@ -632,21 +777,22 @@ function stopTracking() {
   }
 
   const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-  const distKm = (typeof totalDistance !== 'undefined' ? totalDistance : 0).toFixed(2);
-  const paceStr = (typeof currentPace !== 'undefined' ? currentPace : '—');
-  const stepsVal = (typeof steps !== 'undefined' ? steps : 0);
+  const distNum = typeof totalDistance !== 'undefined' ? Number(totalDistance) || 0 : 0;
+  const distKm = distNum.toFixed(2);
+  const paceStr = computePaceText(distNum, elapsed);
+  const stepsVal = typeof steps !== 'undefined' ? Number(steps) || 0 : 0;
   const calVal = Math.round(stepsVal * 0.04);
-  const cadenceVal = (typeof cadence !== 'undefined' ? cadence : 0);
-  const heartVal = (typeof avgHeartRate !== 'undefined' ? avgHeartRate : 125);
+  const cadenceVal = elapsed > 0 ? Math.round((stepsVal / elapsed) * 60) : 0;
+  const heartVal = typeof avgHeartRate !== 'undefined' ? avgHeartRate : 125;
 
   const elDist = document.getElementById('summary-distance');
   if (elDist) elDist.textContent = `${distKm} กม.`;
 
   const elTime = document.getElementById('summary-time');
-  if (elTime) elTime.textContent = formatTime ? formatTime(elapsed) : `${Math.floor(elapsed / 60)}:${elapsed % 60}`;
+  if (elTime) elTime.textContent = formatTime(elapsed);
 
   const elPace = document.getElementById('summary-pace');
-  if (elPace) elPace.textContent = `${paceStr} /กม.`;
+  if (elPace) elPace.textContent = paceStr;
 
   const elSteps = document.getElementById('summary-steps');
   if (elSteps) elSteps.textContent = stepsVal.toLocaleString();
@@ -699,7 +845,6 @@ function resumeTracking() {
     startBtn.classList.add('tracking');
   }
 
-  // เปิดใช้งาน GPS Watch ต่อเนื่อง
   if (navigator.geolocation && watchId === null) {
     watchId = navigator.geolocation.watchPosition(
       (pos) => { processNewCoordinate(pos.coords.latitude, pos.coords.longitude); },
@@ -720,7 +865,6 @@ async function executeDatabaseInsert() {
     return false;
   }
 
-  // ดึงค่าสถิติปัจจุบันให้แน่ใจว่าเป็นตัวเลขที่ถูกต้อง
   const currentDistKm = typeof totalDistance !== 'undefined' ? Number(totalDistance) || 0 : 0;
   const distanceInMeters = Math.round(currentDistKm * 1000);
   const stepsVal = typeof steps !== 'undefined' ? Number(steps) || 0 : 0;
@@ -777,6 +921,9 @@ async function executeDatabaseInsert() {
     if (typeof addPlayerXP === 'function') {
       await addPlayerXP(Math.floor(currentDistKm * 50));
     }
+    if (typeof contributeDistanceToRaidBoss === 'function' && currentDistKm > 0) {
+      await contributeDistanceToRaidBoss(currentDistKm);
+    }
     if (typeof recordClanWarContribution === 'function') {
       await recordClanWarContribution({
         distanceMeters: distanceInMeters,
@@ -785,7 +932,22 @@ async function executeDatabaseInsert() {
       });
     }
     if (typeof loadCapturedTerritories === 'function') {
-      loadCapturedTerritories();
+      loadCapturedTerritories(activeSideMode === 'mine' ? 'mine' : 'all');
+    }
+    if (typeof loadSponsorNodesOnMap === 'function') {
+      await loadSponsorNodesOnMap(
+        activeSideMode === 'sponsors' || activeSideMode === 'boss' ? activeSideMode : 'all',
+        { preserveOpenPopup: true }
+      );
+    }
+    if (typeof loadSponsorNodesOnMap === 'function') {
+      await loadSponsorNodesOnMap(
+        activeSideMode === 'sponsors' || activeSideMode === 'boss' ? activeSideMode : 'all',
+        { preserveOpenPopup: true }
+      );
+    }
+    if (typeof scheduleFogRefresh === 'function') {
+      scheduleFogRefresh();
     }
     return true;
   } catch (err) {
@@ -799,19 +961,16 @@ async function executeDatabaseInsert() {
 async function openShareModal() {
   console.log("📸 [DEBUG] ผู้ใช้กดบันทึกจาก Summary Modal");
 
-  // 1. ปิดหน้า Summary Modal ก่อน
   if (typeof closeTopLayer === 'function') {
     closeTopLayer('summary-modal');
   }
 
-  // 2. สั่งบันทึกลง Supabase
   const success = await executeDatabaseInsert();
   if (!success) {
     console.warn("⚠️ [DEBUG] การบันทึกไม่สำเร็จ ยกเลิกการเปิด Studio");
     return;
   }
 
-  // 3. ถ้าบันทึกสำเร็จ เปิดหน้า KaoKhet Photo Studio ต่อ
   if (typeof openStudioModal === 'function') {
     openStudioModal();
   }
@@ -821,12 +980,10 @@ async function openShareModal() {
 function finishActivity() {
   console.log("✨ [DEBUG] ปิดหน้า Studio และรีเซ็ตค่าสถานะระบบ");
 
-  // 1. ปิดหน้าต่าง Studio
   if (typeof closeTopLayer === 'function') {
     closeTopLayer('share-modal');
   }
 
-  // 2. สั่งรีเซ็ตค่าทางเดินและสถิติหน้าจอหลักให้กลับเป็น 0 ทันที
   if (typeof resetModal === 'function') {
     resetModal();
   }
@@ -835,16 +992,14 @@ function finishActivity() {
 }
 
 function openSummaryModal() {
-  // ดึงค่าสถิติล่าสุดจากจอหลักหรือตัวแปรสถานะ
   const distText = document.getElementById('detail-distance')?.textContent || '0.00 กม.';
   const timeText = document.getElementById('detail-time')?.textContent || '00:00';
-  const paceText = document.getElementById('detail-pace')?.textContent || '— /กม.';
-  const stepsText = document.getElementById('detail-steps')?.textContent || '0';
+  const paceText = document.getElementById('detail-pace')?.textContent || '— min/km';
+  const stepsText = document.getElementById('detail-steps')?.textContent || '0 ก้าว';
   const calText = document.getElementById('detail-cal')?.textContent || '0 kcal';
   const cadenceText = document.getElementById('detail-cadence')?.textContent || '0 spm';
   const heartText = document.getElementById('detail-heart')?.textContent || '125 bpm';
 
-  // นำไปใส่ใน Element ของ Summary Modal
   document.getElementById('summary-distance').textContent = distText;
   document.getElementById('summary-time').textContent = timeText;
   document.getElementById('summary-pace').textContent = paceText;
@@ -853,7 +1008,6 @@ function openSummaryModal() {
   document.getElementById('summary-cadence').textContent = cadenceText;
   document.getElementById('summary-heart').textContent = heartText;
 
-  // เปิด Modal สรุปผล
   if (typeof openTopLayer === 'function') {
     openTopLayer('summary-modal', 'flex');
   }
@@ -878,9 +1032,10 @@ function switchScreen(screenId) {
   if (screenId === 'screen-leaderboard' && typeof switchClanSectionTab === 'function') {
     switchClanSectionTab('leaderboard');
   }
-  if (screenId === 'screen-sponsors') {
-    if (typeof initShopModule === 'function') {
-      initShopModule();
+  if (screenId === 'screen-profile') {
+    updateProfileUI();
+    if (typeof loadProfileModuleData === 'function') {
+      loadProfileModuleData();
     }
   }
 }
@@ -950,134 +1105,629 @@ async function loadHistoryData() {
   }
 }
 
-let sponsorNodesLayerGroup = null;
+// ==========================================
+// MANUAL NODE CHECK-IN (ป้อมปราการ & เรดบอส)
+// ==========================================
+function isNodeCheckedInToday(campaignId, userId) {
+  if (!campaignId) return false;
+  const uid = userId || (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || 'guest';
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const checkedKey = `checked_node_${uid}_${campaignId}_${todayKey}`;
+  return Boolean(localStorage.getItem(checkedKey));
+}
 
-async function loadSponsorNodesOnMap() {
-  if (!map || !supabaseClient) return;
+function getCurrentPositionPromise(options = {}) {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('อุปกรณ์นี้ไม่รองรับ GPS'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 0,
+      ...options
+    });
+  });
+}
 
-  if (!sponsorNodesLayerGroup) {
-    sponsorNodesLayerGroup = L.layerGroup().addTo(map);
-  } else {
-    sponsorNodesLayerGroup.clearLayers();
+async function handleManualNodeCheckIn(campaignId) {
+  if (!campaignId) return;
+
+  if (typeof ensureCurrentUser === 'function') {
+    await ensureCurrentUser();
+  }
+
+  const uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+  if (!uid) {
+    if (typeof showToast === 'function') showToast('⚠️ กรุณาล็อกอินก่อนกดเช็กอินครับ');
+    return;
+  }
+
+  const client = typeof getCampaignClient === 'function' ? getCampaignClient() : supabaseClient;
+  if (!client) {
+    if (typeof showToast === 'function') showToast('❌ ไม่พบการเชื่อมต่อระบบแคมเปญ');
+    return;
   }
 
   try {
-    const { data: campaigns, error } = await supabaseClient
+    if (typeof showToast === 'function') showToast('📡 กำลังตรวจสอบตำแหน่ง GPS...');
+
+    const { data: camp, error } = await client
       .from('campaigns')
-      .select('*')
-      .eq('is_active', true)
-      .not('lat', 'is', null)
-      .not('lng', 'is', null);
+      .select('id, title, lat, lng, node_radius, campaign_type, is_secret_node, is_raid_boss, is_active, checked_in_at')
+      .eq('id', campaignId)
+      .single();
 
-    if (error || !campaigns) return;
+    if (error || !camp) {
+      throw new Error('ไม่พบข้อมูลจุดกิจกรรมนี้');
+    }
 
-    const groupedCampaigns = {};
-    campaigns.forEach(camp => {
-      const key = `${camp.lat}_${camp.lng}`;
-      if (!groupedCampaigns[key]) {
-        groupedCampaigns[key] = {
-          lat: camp.lat,
-          lng: camp.lng,
-          storeId: camp.sponsor_id || camp.created_by || '',
-          merchantName: camp.merchant_name || 'KaoKhet Partner',
-          items: []
-        };
+    if (camp.is_active === false) {
+      if (typeof showToast === 'function') showToast('⚠️ แคมเปญนี้ปิดรับกิจกรรมแล้วครับ');
+      return;
+    }
+
+    const latNum = Number(camp.lat);
+    const lngNum = Number(camp.lng);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+      throw new Error('จุดกิจกรรมนี้ยังไม่ได้ตั้งค่าพิกัดบนแผนที่');
+    }
+
+    const radius = Number(camp.node_radius) > 0 ? Number(camp.node_radius) : 50;
+    const pos = await getCurrentPositionPromise();
+    const userLat = pos.coords.latitude;
+    const userLng = pos.coords.longitude;
+
+    let distanceMeters = Infinity;
+    if (typeof map !== 'undefined' && map && typeof map.distance === 'function') {
+      distanceMeters = map.distance([userLat, userLng], [latNum, lngNum]);
+    } else if (typeof L !== 'undefined' && L.latLng) {
+      distanceMeters = L.latLng(userLat, userLng).distanceTo(L.latLng(latNum, lngNum));
+    }
+
+    if (distanceMeters > radius) {
+      const diffMeters = Math.ceil(distanceMeters - radius);
+      if (typeof showToast === 'function') {
+        showToast(
+          `📍 คุณอยู่ห่างจากจุด "${camp.title || 'กิจกรรม'}" ${Math.round(distanceMeters)} ม. (รัศมี ${radius} ม. — ขาดอีก ~${diffMeters} ม.)`
+        );
       }
-      groupedCampaigns[key].items.push(camp);
+      return;
+    }
+
+    const checkedAtIso = new Date().toISOString();
+    const todayKey = checkedAtIso.slice(0, 10);
+    const checkedKey = `checked_node_${uid}_${camp.id}_${todayKey}`;
+    localStorage.setItem(
+      checkedKey,
+      JSON.stringify({
+        checkedAt: checkedAtIso,
+        lat: userLat,
+        lng: userLng,
+        distanceMeters: Math.round(distanceMeters)
+      })
+    );
+
+    // บันทึกเวลาเช็กอินลงคอลัมน์ checked_in_at ในตาราง campaigns
+    await recordCampaignCheckInTimestamp(camp.id, checkedAtIso);
+
+    const isRaid = camp.campaign_type === 'raid_boss' || Boolean(camp.is_raid_boss);
+    if (typeof showToast === 'function') {
+      showToast(
+        isRaid
+          ? `✅ เช็กอินจุดเรดบอส "${camp.title || 'บอส'}" สำเร็จ! กดเริ่มเดิน/วิ่งเพื่อสะสมระยะทางได้เลย`
+          : `✅ เช็กอินป้อมปราการ "${camp.title || 'หน้าร้าน'}" สำเร็จ! พร้อมกดรับสิทธิ์แล้ว`
+      );
+    }
+
+    if (typeof loadSponsorNodesOnMap === 'function') {
+      await loadSponsorNodesOnMap(
+        activeSideMode === 'sponsors' || activeSideMode === 'boss' ? activeSideMode : 'all',
+        { preserveOpenPopup: true }
+      );
+    }
+  } catch (err) {
+    console.error('Manual node check-in error:', err);
+    if (typeof showToast === 'function') {
+      showToast('❌ เช็กอินไม่สำเร็จ: ' + (err.message || 'กรุณาอนุญาตการเข้าถึงตำแหน่ง GPS'));
+    }
+  }
+}
+
+// ==========================================
+// ⚡ Supabase Realtime & Popup Persistence สำหรับ Sponsor / Red Boss
+// ==========================================
+function buildSponsorNodeKey(camp) {
+  const lat = Number(camp.lat);
+  const lng = Number(camp.lng);
+  return `${camp.id ?? ''}::${lat.toFixed(6)}::${lng.toFixed(6)}`;
+}
+
+function bindSponsorPopupPersistence(marker, nodeKey) {
+  marker.on('popupopen', () => {
+    activeSponsorPopupKey = nodeKey;
+  });
+
+  marker.on('popupclose', (e) => {
+    if (e && e.popup && sponsorNodesLayerGroup && map && map.hasLayer(sponsorNodesLayerGroup)) {
+      if (activeSponsorPopupKey === nodeKey) {
+        activeSponsorPopupKey = null;
+      }
+    }
+  });
+}
+
+function scheduleSponsorNodesRealtimeReload(filterType = 'all', delayMs = 350) {
+  if (sponsorRealtimeDebounceTimer) {
+    clearTimeout(sponsorRealtimeDebounceTimer);
+  }
+  sponsorRealtimeDebounceTimer = setTimeout(() => {
+    sponsorRealtimeDebounceTimer = null;
+    loadSponsorNodesOnMap(filterType || currentSponsorFilterType || 'all', {
+      preserveOpenPopup: true
+    });
+  }, delayMs);
+}
+
+async function subscribeSponsorNodesRealtime(filterType = 'all') {
+  currentSponsorFilterType = filterType || 'all';
+  const client = typeof getCampaignClient === 'function' ? getCampaignClient() : supabaseClient;
+  if (!client || typeof client.channel !== 'function') return;
+
+  if (typeof ensureCurrentUser === 'function') {
+    await ensureCurrentUser();
+  }
+  const uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+
+  if (sponsorRealtimeChannel) {
+    try {
+      await client.removeChannel(sponsorRealtimeChannel);
+    } catch (err) {
+      console.warn('ถอด Realtime channel เดิมไม่สำเร็จ:', err);
+    }
+    sponsorRealtimeChannel = null;
+  }
+
+  const channelName = `sponsor-nodes-realtime-${uid || 'guest'}-${currentSponsorFilterType}`;
+  const channel = client.channel(channelName);
+
+  // รับอัปเดตสดจากตาราง campaigns (ความคืบหน้ารวม, สถานะบอสแตก, checked_in_at, defeated_at)
+  channel.on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'campaigns'
+    },
+    () => {
+      scheduleSponsorNodesRealtimeReload(currentSponsorFilterType);
+    }
+  );
+
+  // รับอัปเดตสดจากตาราง journeys เฉพาะของผู้ใช้คนนี้ (ระยะส่วนตัว)
+  if (uid) {
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'journeys',
+        filter: `user_id=eq.${uid}`
+      },
+      () => {
+        scheduleSponsorNodesRealtimeReload(currentSponsorFilterType);
+      }
+    );
+  }
+
+  channel.subscribe((status) => {
+    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      console.warn('สถานะ Sponsor Realtime:', status);
+    }
+  });
+
+  sponsorRealtimeChannel = channel;
+}
+
+// ==========================================
+// 👑 โหลดหมุดแคมเปญ & Red Boss บนแผนที่
+// ==========================================
+function getRedBossState(camp) {
+  const current = Number(camp.current_distance_km || 0);
+  const target = Math.max(0.1, Number(camp.target_distance_km || 10));
+  const pct = Math.min(100, Math.max(0, (current / target) * 100));
+
+  // สถานะ 3: พิชิตสำเร็จ / ปลดล็อกรางวัล
+  if (pct >= 100 || camp.status === 'completed') {
+    return {
+      code: 3,
+      className: 'redboss-state-3',
+      icon: '🏆',
+      mapLabel: 'RED BOSS (สำเร็จ! รับรางวัลได้)',
+      statusLabel: '🟢 พิชิตสำเร็จ / ปลดล็อกรางวัล',
+      pct: 100,
+      current,
+      target
+    };
+  }
+
+  // สถานะ 2: กำลังต่อสู้ / กำลังสะสมคะแนน
+  if (current > 0) {
+    return {
+      code: 2,
+      className: 'redboss-state-2',
+      icon: '🐲',
+      mapLabel: `RED BOSS (กำลังโจมตี! ${pct.toFixed(0)}%)`,
+      statusLabel: '🟠 กำลังต่อสู้ / กำลังสะสมคะแนน',
+      pct,
+      current,
+      target
+    };
+  }
+
+  // สถานะ 1: รอเควสต์ / ยังไม่เริ่มสะสมเป้าหมาย
+  return {
+    code: 1,
+    className: 'redboss-state-1',
+    icon: '👾',
+    mapLabel: 'RED BOSS (รอพลังชุมชน)',
+    statusLabel: '🔴 รอเควสต์ / ยังไม่เริ่มสะสมเป้าหมาย',
+    pct: 0,
+    current,
+    target
+  };
+}
+
+function createRedBossMarkerIcon(camp, state) {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="redboss-marker-wrap ${state.className}">
+        <div class="redboss-avatar">${state.icon}</div>
+        <div class="redboss-badge">
+          <div>${state.mapLabel}</div>
+          <div class="redboss-mini-bar">
+            <div class="redboss-mini-fill" style="width:${state.pct.toFixed(1)}%;"></div>
+          </div>
+        </div>
+      </div>
+    `,
+    iconSize: [150, 72],
+    iconAnchor: [75, 24],
+    popupAnchor: [0, -24]
+  });
+}
+
+async function loadSponsorNodesOnMap(filterType = 'all', options = {}) {
+  const preserveOpenPopup = Boolean(options.preserveOpenPopup);
+  const previousOpenKey = preserveOpenPopup ? activeSponsorPopupKey : null;
+
+  if (typeof map === 'undefined' || !map) return;
+
+  if (!sponsorNodesLayerGroup) {
+    sponsorNodesLayerGroup = L.layerGroup();
+  } else {
+    sponsorNodesLayerGroup.clearLayers();
+  }
+  if (!map.hasLayer(sponsorNodesLayerGroup)) {
+    sponsorNodesLayerGroup.addTo(map);
+  }
+
+  const client = typeof getCampaignClient === 'function' ? getCampaignClient() : supabaseClient;
+  if (!client) return;
+
+  if (typeof ensureCurrentUser === 'function') {
+    await ensureCurrentUser();
+  }
+  const uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+
+  const { data: campaigns, error } = await client
+    .from('campaigns')
+    .select('*')
+    .eq('is_active', true);
+
+  if (error || !Array.isArray(campaigns)) return;
+
+  const escapeAttr = (val) =>
+    String(val ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+  const formatKm = (num) => {
+    const n = Number(num) || 0;
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  };
+
+  let userJourneys = [];
+  if (uid) {
+    const { data: journeysData, error: journeysError } = await client
+      .from('journeys')
+      .select('distance_meters, started_at, created_at')
+      .eq('user_id', uid);
+
+    if (!journeysError && Array.isArray(journeysData)) {
+      userJourneys = journeysData;
+    }
+  }
+
+  const getPersonalDistanceKmAfterCheckIn = (camp) => {
+    if (!uid || !camp.checked_in_at) return 0;
+    const checkInMs = new Date(camp.checked_in_at).getTime();
+    if (!Number.isFinite(checkInMs)) return 0;
+
+    const totalMeters = userJourneys.reduce((sum, row) => {
+      const journeyTimeRaw = row.started_at || row.created_at;
+      if (!journeyTimeRaw) return sum;
+      const journeyMs = new Date(journeyTimeRaw).getTime();
+      if (!Number.isFinite(journeyMs) || journeyMs < checkInMs) return sum;
+
+      const meters = Number(row.distance_meters || 0);
+      return sum + (Number.isFinite(meters) ? meters : 0);
+    }, 0);
+
+    return totalMeters / 1000;
+  };
+
+  const evaluateBossClaimEligibility = (camp, bossState, checkedIn, personalDistKm, effectiveDefeatedAt) => {
+    const minKm = Number(camp.min_distance_km || 0);
+    const claimHours = Number(camp.claim_window_hours || 24);
+
+    const defeatedRaw = effectiveDefeatedAt || camp.defeated_at || camp.boss_defeated_at || bossState.defeatedAt || null;
+    let isExpired = false;
+    if (defeatedRaw && claimHours > 0) {
+      const defeatedMs = new Date(defeatedRaw).getTime();
+      if (Number.isFinite(defeatedMs)) {
+        const deadlineMs = defeatedMs + claimHours * 60 * 60 * 1000;
+        isExpired = Date.now() > deadlineMs;
+      }
+    }
+
+    if (!checkedIn || !camp.checked_in_at) {
+      return { eligible: false, reason: 'ต้องเช็กอินในรัศมีร้านค้าก่อนรับสิทธิ์' };
+    }
+    if (personalDistKm < minKm) {
+      return {
+        eligible: false,
+        reason: `ระยะส่วนตัว ${formatKm(personalDistKm)} / ${formatKm(minKm)} กม. (ยังไม่ถึงเกณฑ์)`
+      };
+    }
+    if (isExpired) {
+      return { eligible: false, reason: `เลยกรอบเวลารับสิทธิ์ (${claimHours} ชม. หลังบอสแตก)` };
+    }
+
+    return { eligible: true, reason: '' };
+  };
+
+  let markerToReopen = null;
+
+  for (const camp of campaigns) {
+    const latNum = Number(camp.lat);
+    const lngNum = Number(camp.lng);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) continue;
+
+    const mode =
+      camp.campaign_type ||
+      (camp.is_raid_boss ? 'raid_boss' : camp.is_secret_node ? 'fortress' : 'normal');
+
+    if (filterType === 'boss' && mode !== 'raid_boss') continue;
+    if (filterType === 'sponsors' && mode === 'raid_boss') continue;
+
+    const requiresManualCheckIn = mode === 'fortress' || mode === 'raid_boss';
+    const radius = Number(camp.node_radius) > 0 ? Number(camp.node_radius) : 50;
+    const alreadyChecked = requiresManualCheckIn
+      ? isNodeCheckedInToday(camp.id, uid) || Boolean(camp.checked_in_at)
+      : false;
+
+    const radiusCircle = L.circle([latNum, lngNum], {
+      radius,
+      color: mode === 'raid_boss' ? '#dc2626' : mode === 'fortress' ? '#d97706' : '#2563eb',
+      fillOpacity: 0.12,
+      weight: 2
     });
 
-    Object.values(groupedCampaigns).forEach(group => {
-      const isBossGroup = group.items.some(i => i.is_raid_boss);
-      const isSecretGroup = group.items.some(i => i.is_secret_node);
+    const rawTitle = camp.title || 'แคมเปญกิจกรรม';
+    const rawMerchant = camp.merchant_name || camp.shop_name || rawTitle || 'ร้านค้าพันธมิตร';
+    const safeTitle = escapeAttr(rawTitle);
+    const safeMerchant = escapeAttr(rawMerchant);
+    const safeId = escapeAttr(camp.id);
+    const nodeKey = buildSponsorNodeKey(camp);
 
-      let pinIcon = '🏪';
-      let pinClass = 'sponsor-pin';
-      if (isBossGroup) {
-        pinIcon = '👹';
-        pinClass = 'boss-pin';
-      } else if (isSecretGroup) {
-        pinIcon = '🥷';
-        pinClass = 'secret-pin';
+    if (mode === 'raid_boss') {
+      const bossState = getRedBossState(camp);
+      let effectiveDefeatedAt = camp.defeated_at || null;
+
+      // หากบอสแตกแล้ว (สถานะ 3) แต่ยังไม่มีเวลา defeated_at ในตาราง ให้บันทึกอัตโนมัติ
+      if (bossState.code === 3 && !effectiveDefeatedAt) {
+        effectiveDefeatedAt = new Date().toISOString();
+        recordCampaignDefeatedTimestamp(camp.id, effectiveDefeatedAt);
       }
 
-      const marker = L.marker([group.lat, group.lng], {
-        icon: L.divIcon({
-          className: pinClass,
-          html: `<div style="background:white; border-radius:50%; width:34px; height:34px; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,0.3); font-size:18px;">${pinIcon}</div>`,
-          iconSize: [34, 34],
-          iconAnchor: [17, 17]
-        })
-      });
+      const bossIcon = createRedBossMarkerIcon(camp, bossState);
+      const marker = L.marker([latNum, lngNum], { icon: bossIcon });
 
-      let popupHtml = `
-        <div style="text-align:center; min-width:200px;">
-          <div style="font-size:13px; font-weight:800; color:#3b82f6; margin-bottom:4px;">${group.merchantName}</div>
-          <div style="border-top:1px solid #e5e7eb; margin-bottom:8px;"></div>
-      `;
+      const minKm = Number(camp.min_distance_km || 0);
+      const claimHours = Number(camp.claim_window_hours || 24);
+      const pointsCost = Number(camp.points_cost ?? 0);
 
-      group.items.forEach(camp => {
-        const safeRewardAttr = encodeURIComponent(camp.reward_details || 'สิทธิ์พิเศษ');
-        const safeCampaignId = String(camp.id || '').replace(/'/g, "\\'");
-        const isBoss = camp.is_raid_boss;
-        const isSecret = camp.is_secret_node;
+      // แถบเป้าหมายชุมชน (รวมทุกคน)
+      const targetText = formatKm(bossState.target);
+      const currentText = formatKm(bossState.current);
+      const pctNum = Math.max(0, Math.min(100, Number(bossState.pct || 0)));
 
-        popupHtml += `
-          <div style="background:#f9fafb; padding:8px; border-radius:8px; margin-bottom:8px; text-align:left; border-left:4px solid #22c55e;">
-            <div style="font-size:13px; font-weight:700; color:#1f2937;">${camp.title || ''}</div>
-            <div style="font-size:11px; color:#16a34a; font-weight:600; margin:2px 0;">🎁 ${camp.reward_details || 'สิทธิ์พิเศษ'}</div>
-        `;
+      // แถบความก้าวหน้าเฉพาะบุคคล (ดึงจาก journeys หลัง checked_in_at)
+      const personalDistKm = getPersonalDistanceKmAfterCheckIn(camp);
+      const personalText = formatKm(personalDistKm);
+      const minKmText = formatKm(minKm);
+      const personalPct =
+        minKm > 0
+          ? Math.max(0, Math.min(100, (personalDistKm / minKm) * 100))
+          : alreadyChecked
+            ? 100
+            : 0;
+      const personalDone = personalDistKm >= minKm && alreadyChecked;
+      const personalBarBg = personalDone
+        ? 'linear-gradient(90deg,#16a34a,#22c55e)'
+        : 'linear-gradient(90deg,#0284c7,#38bdf8)';
+      const personalColor = personalDone ? '#86efac' : '#7dd3fc';
 
-        if (isBoss) {
-          const progress = Number(camp.current_distance_km || 0);
-          const target = Number(camp.target_distance_km || 500);
-          popupHtml += `
-            <div style="background:#fffbeb; border:1px solid #fde68a; padding:4px; border-radius:6px; font-size:10px; margin-top:4px;">
-              <b>👹 บอส: ${camp.boss_name || 'บอสประจำถิ่น'}</b><br>
-              ความคืบหน้า: ${progress.toFixed(1)} / ${target} กม.
+      let actionSectionHtml = '';
+
+      if (bossState.code === 3) {
+        const claimCheck = evaluateBossClaimEligibility(
+          camp,
+          bossState,
+          alreadyChecked,
+          personalDistKm,
+          effectiveDefeatedAt
+        );
+        if (claimCheck.eligible) {
+          actionSectionHtml = `
+            <button type="button" onclick="handleClaimCampaign('${safeId}', '${safeTitle}')" style="margin-top:8px;padding:8px 10px;border:none;border-radius:8px;background:#16a34a;color:#fff;font-size:12px;font-weight:700;cursor:pointer;width:100%;">
+              🎁 รับคูปองเข้ากระเป๋า (${pointsCost} Pts)
+            </button>
+            <div style="margin-top:4px;font-size:10px;color:#a1a1aa;text-align:center;">
+              รับแล้วเก็บในกระเป๋า เพื่อนำไปใช้ที่ร้านค้า
             </div>
           `;
-        } else if (isSecret) {
-          popupHtml += `
-            <div style="font-size:10px; color:#d97706; background:#fef3c7; padding:2px 4px; border-radius:4px; margin-top:4px;">
-              🥷 คูปองลับ: ต้องเช็กอินหน้าร้านเท่านั้น!
+        } else {
+          actionSectionHtml = `
+            <div style="margin-top:8px;padding:6px 8px;border-radius:8px;background:rgba(239,68,68,0.14);border:1px solid rgba(248,113,113,0.35);color:#fca5a5;font-size:11px;font-weight:600;text-align:center;">
+              🔒 ยังรับสิทธิ์ไม่ได้: ${escapeAttr(claimCheck.reason)}
             </div>
           `;
         }
-
-        popupHtml += `
-            <button onclick="handleClaimCampaign('${safeCampaignId}', decodeURIComponent('${safeRewardAttr}'))" style="margin-top:6px; background:#22c55e; color:white; border:none; padding:5px 8px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; width:100%;">
-              🪙 แลกรับ (${camp.points_cost || 0} Pts)
-            </button>
-          </div>
-        `;
-      });
-
-      if (group.storeId) {
-        const safeStoreId = String(group.storeId).replace(/'/g, "\\'");
-        popupHtml += `
-          <button onclick="goToStoreProfile('${safeStoreId}')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; width:100%; margin-top:4px;">
-            🏪 ดูโปรไฟล์ร้านค้า
-          </button>
-        `;
+      } else {
+        actionSectionHtml = alreadyChecked
+          ? `<div style="margin-top:8px;padding:6px 8px;border-radius:8px;background:rgba(34,197,94,0.16);color:#86efac;font-size:11px;font-weight:700;text-align:center;">
+               ✅ เช็กอินในรัศมีจุดร้านค้าแล้ว
+             </div>`
+          : `<button type="button" onclick="handleManualNodeCheckIn('${safeId}')" style="margin-top:8px;padding:7px 10px;border:none;border-radius:8px;background:#0284c7;color:#fff;font-size:12px;font-weight:700;cursor:pointer;width:100%;">
+               ✅ เช็กอินจุดนี้
+             </button>`;
       }
 
-      popupHtml += `</div>`;
+      const bossPopupHtml = `
+        <div style="min-width:225px;max-width:255px;background:#18181b;color:#f4f4f5;border:1.5px solid #ef4444;border-radius:12px;padding:11px;font-family:inherit;line-height:1.4;">
+          <div style="font-size:10px;font-weight:700;color:#fca5a5;">${escapeAttr(bossState.statusLabel || '')}</div>
+          <div style="font-size:14px;font-weight:800;margin-top:2px;color:#fff;">🔴 RED BOSS · ${safeTitle}</div>
+          <div style="margin-top:4px;font-size:11px;color:#d4d4d8;">
+            📍 ร้าน <b>${safeMerchant}</b> · รัศมี ${radius} ม.
+          </div>
 
-      marker.bindPopup(popupHtml);
-      sponsorNodesLayerGroup.addLayer(marker);
+          <div style="margin-top:8px;background:rgba(255,255,255,0.06);padding:7px 8px;border-radius:8px;display:flex;flex-direction:column;gap:7px;">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+                <span>🔥 เป้าหมายชุมชน</span>
+                <b style="color:#fde047;">${currentText} / ${targetText} กม. (${pctNum.toFixed(0)}%)</b>
+              </div>
+              <div style="width:100%;height:6px;background:#3f3f46;border-radius:999px;overflow:hidden;">
+                <div style="width:${pctNum.toFixed(1)}%;height:100%;background:linear-gradient(90deg,#f97316,#ef4444);"></div>
+              </div>
+            </div>
 
-      const maxRadius = Math.max(...group.items.map(i => i.node_radius || 50));
-      L.circle([group.lat, group.lng], {
-        radius: maxRadius,
-        interactive: false,
-        color: isBossGroup ? '#ef4444' : (isSecretGroup ? '#d97706' : '#3b82f6'),
-        fillColor: isBossGroup ? '#ef4444' : (isSecretGroup ? '#d97706' : '#3b82f6'),
-        fillOpacity: 0.15,
-        weight: 1
-      }).addTo(sponsorNodesLayerGroup);
-    });
-  } catch (err) {
-    console.error('Error loading sponsor nodes on map:', err);
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+                <span>🏃 ระยะของคุณ</span>
+                <b style="color:${personalColor};">${personalText} / ${minKmText} กม. (${personalPct.toFixed(0)}%)</b>
+              </div>
+              <div style="width:100%;height:6px;background:#3f3f46;border-radius:999px;overflow:hidden;">
+                <div style="width:${personalPct.toFixed(1)}%;height:100%;background:${personalBarBg};"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:7px;font-size:10.5px;color:#a1a1aa;text-align:center;">
+            เช็กอินโซน · ขั้นต่ำ ${minKmText} กม. · รับใน ${claimHours} ชม.
+          </div>
+
+          ${actionSectionHtml}
+        </div>
+      `;
+
+      marker.bindPopup(bossPopupHtml);
+      bindSponsorPopupPersistence(marker, nodeKey);
+      if (previousOpenKey && previousOpenKey === nodeKey) {
+        markerToReopen = marker;
+      }
+
+      radiusCircle.addTo(sponsorNodesLayerGroup);
+      marker.addTo(sponsorNodesLayerGroup);
+      continue;
+    }
+
+    const badgeText =
+      mode === 'fortress'
+        ? '🏰 ป้อมปราการหน้าร้าน'
+        : '🎁 แคมเปญพิเศษ';
+
+    const marker = L.marker([latNum, lngNum]);
+    const claimBtnHtml = `<button type="button" onclick="handleClaimCampaign('${safeId}', '${safeTitle}')" style="margin-top:6px;padding:6px 10px;border:none;border-radius:8px;background:#16a34a;color:#fff;font-weight:600;cursor:pointer;width:100%;">🎟️ แลกรับสิทธิ์ (${camp.points_cost ?? 0} Pts)</button>`;
+
+    const checkInBtnHtml = requiresManualCheckIn
+      ? alreadyChecked
+        ? `<div style="margin-top:6px;padding:6px 10px;border-radius:8px;background:#dcfce7;color:#166534;font-weight:600;text-align:center;">✅ เช็กอินวันนี้แล้ว</div>`
+        : `<button type="button" onclick="handleManualNodeCheckIn('${safeId}')" style="margin-top:6px;padding:6px 10px;border:none;border-radius:8px;background:#0284c7;color:#fff;font-weight:600;cursor:pointer;width:100%;">📍 กดเช็กอินจุดนี้ (รัศมี ${radius} ม.)</button>`
+      : '';
+
+    const popupHtml = `
+      <div style="min-width:190px;font-family:inherit;">
+        <div style="font-size:11px;font-weight:700;color:#4b5563;">${badgeText}</div>
+        <div style="font-size:14px;font-weight:700;margin-top:2px;">${safeTitle}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px;">🏪 ${safeMerchant}</div>
+        ${checkInBtnHtml}
+        ${claimBtnHtml}
+      </div>
+    `;
+
+    marker.bindPopup(popupHtml);
+    bindSponsorPopupPersistence(marker, nodeKey);
+    if (previousOpenKey && previousOpenKey === nodeKey) {
+      markerToReopen = marker;
+    }
+
+    radiusCircle.addTo(sponsorNodesLayerGroup);
+    marker.addTo(sponsorNodesLayerGroup);
+  }
+
+  if (markerToReopen) {
+    markerToReopen.openPopup();
+    activeSponsorPopupKey = previousOpenKey;
+  }
+}
+
+async function recordCampaignCheckInTimestamp(campaignId, customIso = null) {
+  const client = typeof getCampaignClient === 'function' ? getCampaignClient() : supabaseClient;
+  if (!client || !campaignId) return;
+
+  const nowIso = customIso || new Date().toISOString();
+  const { error } = await client
+    .from('campaigns')
+    .update({ checked_in_at: nowIso })
+    .eq('id', campaignId)
+    .is('checked_in_at', null);
+
+  if (error) {
+    console.warn('อัปเดต checked_in_at ไม่สำเร็จ:', error.message);
+  }
+}
+
+async function recordCampaignDefeatedTimestamp(campaignId, customIso = null) {
+  const client = typeof getCampaignClient === 'function' ? getCampaignClient() : supabaseClient;
+  if (!client || !campaignId) return;
+
+  const nowIso = customIso || new Date().toISOString();
+  const { error } = await client
+    .from('campaigns')
+    .update({ defeated_at: nowIso })
+    .eq('id', campaignId)
+    .is('defeated_at', null);
+
+  if (error) {
+    console.warn('อัปเดต defeated_at ไม่สำเร็จ:', error.message);
   }
 }
 

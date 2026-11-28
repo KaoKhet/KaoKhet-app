@@ -588,6 +588,12 @@ async function renderMyClanSection() {
     container.innerHTML = '<div style="text-align:center; color:#9ca3af; padding:32px 0;">⏳ กำลังโหลดข้อมูลแคลนและสมาชิก...</div>';
 
     try {
+        const formatMemberLabel = (p, fallback = 'นักวิ่ง KaoKhet') => {
+            const name = (p?.display_name || '').trim();
+            if (name) return name;
+            return p?.email || fallback;
+        };
+
         const { data: members } = await supabaseClient
             .from('clan_members')
             .select('*')
@@ -596,7 +602,7 @@ async function renderMyClanSection() {
 
         const memberIds = (members || []).map(m => m.user_id);
         const { data: profilesData } = memberIds.length > 0
-            ? await supabaseClient.from('profiles').select('id, email, level').in('id', memberIds)
+            ? await supabaseClient.from('profiles').select('id, email, display_name, level').in('id', memberIds)
             : { data: [] };
 
         const profileMap = {};
@@ -613,7 +619,7 @@ async function renderMyClanSection() {
 
             const reqIds = (pendingReqs || []).map(r => r.user_id);
             const { data: reqProfiles } = reqIds.length > 0
-                ? await supabaseClient.from('profiles').select('id, email, level').in('id', reqIds)
+                ? await supabaseClient.from('profiles').select('id, email, display_name, level').in('id', reqIds)
                 : { data: [] };
             const reqProfileMap = {};
             (reqProfiles || []).forEach(p => { reqProfileMap[p.id] = p; });
@@ -627,7 +633,7 @@ async function renderMyClanSection() {
                     return `
                 <div style="background:#fff; border-radius:10px; padding:10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
                   <div style="min-width:0;">
-                    <div style="font-size:12.5px; font-weight:700; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtmlClan(p.email || req.user_id)}</div>
+                    <div style="font-size:12.5px; font-weight:700; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtmlClan(formatMemberLabel(p, req.user_id))}</div>
                     <div style="font-size:11px; color:#6b7280;">Lv.${p.level || 1}</div>
                   </div>
                   <div style="display:flex; gap:6px; flex-shrink:0;">
@@ -682,7 +688,7 @@ async function renderMyClanSection() {
         <div style="background:#fff; border-radius:12px; padding:11px 12px; margin-bottom:8px; border:1px solid #f3f4f6; display:flex; justify-content:space-between; align-items:center; gap:8px;">
           <div style="min-width:0;">
             <div style="font-size:13px; font-weight:700; color:#1f2937; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-              <span>#${idx + 1} ${escapeHtmlClan(p.email || 'นักวิ่ง KaoKhet')}</span>
+              <span>#${idx + 1} ${escapeHtmlClan(formatMemberLabel(p, 'นักวิ่ง KaoKhet'))}</span>
               ${roleBadge}
             </div>
             <div style="font-size:11px; color:#6b7280; margin-top:2px;">

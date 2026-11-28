@@ -2,38 +2,356 @@
 // 👑 merchantModule.js — ระบบผู้ประกอบการ จัดการแคมเปญ สแกน QR และประวัติ
 // ==========================================
 
-async function checkMerchantPermission(userId) {
-    const merchantPanel = document.getElementById('merchant-control-panel');
-    if (!merchantPanel) return;
+let cachedMerchantStoreInfo = null;
+let merchantVideoStream = null;
+let merchantScanInterval = null;
+let merchantAuthListenerBound = false;
 
-    if (!userId) {
-        merchantPanel.style.display = 'none';
-        return;
+const CAMPAIGN_MODE_META = {
+    normal: {
+        title: '✨ เพิ่มแคมเปญธรรมดาทั่วไป',
+        helperHtml: '<strong>แคมเปญธรรมดา:</strong> แสดงหมุดโปรโมชันบนแผนที่พร้อมปุ่มเข้าหน้าร้าน ผู้เล่นใช้พอยต์แลกคูปองทั่วไปได้ทันที',
+        bgColor: '#eff6ff',
+        borderColor: '#bfdbfe',
+        textColor: '#1e40af',
+        btnBorder: '2px solid #2563eb',
+        btnBg: '#eff6ff',
+        btnColor: '#1d4ed8'
+    },
+    fortress: {
+        title: '🏰 เพิ่มป้อมปราการหน้าร้าน',
+        helperHtml: '<strong>ป้อมปราการหน้าร้าน:</strong> แสดงจุดบนแผนที่ตั้งแต่แรก ผู้เล่นเดินทางมาเช็กอินในรัศมีเพื่อปลดล็อกสิทธิ์หรือคูปองลับหน้าร้าน',
+        bgColor: '#fffbeb',
+        borderColor: '#fde68a',
+        textColor: '#92400e',
+        btnBorder: '2px solid #d97706',
+        btnBg: '#fffbeb',
+        btnColor: '#b45309'
+    },
+    raid_boss: {
+        title: '🐲 เพิ่มแคมเปญเรดบอส (Boss Map)',
+        helperHtml: '<strong>เรดบอส (Boss Map):</strong> เปิดได้ทุกวันภายใต้กฎระยะห่าง/คูลดาวน์ ผู้เล่นเช็กอินในรัศมีแล้วเดิน/วิ่งสะสมระยะทางให้ถึงเป้าและผ่านเกณฑ์ขั้นต่ำ',
+        bgColor: '#fef2f2',
+        borderColor: '#fecaca',
+        textColor: '#991b1b',
+        btnBorder: '2px solid #dc2626',
+        btnBg: '#fef2f2',
+        btnColor: '#dc2626'
     }
+};
 
-    try {
-        const { data, error } = await supabaseClient.from('profiles').select('role').eq('id', userId).single();
-        if (error) throw error;
-
-        const userRole = data?.role ? data.role.trim().toLowerCase() : '';
-        if (userRole === 'merchant') {
-            merchantPanel.style.display = 'block';
-        } else {
-            merchantPanel.style.display = 'none';
-        }
-    } catch (err) {
-        console.error('Error checking permission:', err);
-        merchantPanel.style.display = 'none';
+function notifyMerchant(msg, fallbackAlert = false) {
+    if (typeof showToast === 'function') {
+        showToast(msg);
+    } else if (fallbackAlert) {
+        alert(msg);
     }
 }
 
-// เปิด Modal จัดการแคมเปญ (แสดงรายการแคมเปญทั้งหมดของผู้ประกอบการก่อน)
+async function resolveMerchantUserId() {
+    if (typeof currentUser !== 'undefined' && currentUser?.id) {
+        return currentUser.id;
+    }
+    if (typeof ensureCurrentUser === 'function') {
+        try {
+            await ensureCurrentUser();
+            if (typeof currentUser !== 'undefined' && currentUser?.id) {
+                return currentUser.id;
+            }
+        } catch (_) { }
+    }
+    if (typeof supabaseClient !== 'undefined' && supabaseClient?.auth) {
+        try {
+            const { data } = await supabaseClient.auth.getSession();
+            return data?.session?.user?.id || null;
+        } catch (_) { }
+    }
+    return null;
+}
+
+async function checkMerchantPermission(userId = null) {
+    const merchantPanel = document.getElementById('merchant-control-panel');
+    if (!merchantPanel) return false;
+
+    const targetUserId = userId || await resolveMerchantUserId();
+    if (!targetUserId || typeof supabaseClient === 'undefined' || !supabaseClient) {
+        merchantPanel.style.display = 'none';
+        return false;
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('profiles')
+            .select('role')
+            .eq('id', targetUserId)
+            .single();
+
+        if (error) throw error;
+
+        const userRole = data?.role ? String(data.role).trim().toLowerCase() : '';
+        const isMerchant = userRole === 'merchant';
+        merchantPanel.style.display = isMerchant ? 'block' : 'none';
+        return isMerchant;
+    } catch (err) {
+        console.error('Error checking permission:', err);
+        merchantPanel.style.display = 'none';
+        return false;
+    }
+}
+
+function bindMerchantAuthAutoCheck() {
+    if (merchantAuthListenerBound) return;
+    merchantAuthListenerBound = true;
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient?.auth?.onAuthStateChange) {
+        supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+            const uid = session?.user?.id || (typeof currentUser !== 'undefined' ? currentUser?.id : null);
+            await checkMerchantPermission(uid);
+        });
+    }
+}
+
+// ==========================================
+// 🎯 ระบบแยกโหมดแคมเปญ 3 รูปแบบ ('normal' | 'fortress' | 'raid_boss')
+// ==========================================
+
+function detectCampaignMode(camp = {}) {
+    if (camp.campaign_type && ['normal', 'fortress', 'raid_boss'].includes(camp.campaign_type)) {
+        return camp.campaign_type;
+    }
+    if (camp.is_raid_boss) return 'raid_boss';
+    if (camp.is_secret_node || (camp.node_radius && Number(camp.node_radius) !== 50)) return 'fortress';
+    return 'normal';
+}
+
+function updateModeSwitcherUI(mode = 'normal') {
+    const selectedMode = ['normal', 'fortress', 'raid_boss'].includes(mode) ? mode : 'normal';
+
+    ['normal', 'fortress', 'raid_boss'].forEach((m) => {
+        const btn = document.getElementById(`mode-btn-${m}`);
+        if (!btn) return;
+        if (m === selectedMode) {
+            const meta = CAMPAIGN_MODE_META[m];
+            btn.style.border = meta.btnBorder;
+            btn.style.background = meta.btnBg;
+            btn.style.color = meta.btnColor;
+            btn.style.fontWeight = '800';
+        } else {
+            btn.style.border = '1px solid #e5e7eb';
+            btn.style.background = '#fff';
+            btn.style.color = '#4b5563';
+            btn.style.fontWeight = '700';
+        }
+    });
+
+    const helperBanner = document.getElementById('campaign-mode-helper-banner');
+    if (helperBanner) {
+        const meta = CAMPAIGN_MODE_META[selectedMode];
+        helperBanner.innerHTML = meta.helperHtml;
+        helperBanner.style.background = meta.bgColor;
+        helperBanner.style.borderColor = meta.borderColor;
+        helperBanner.style.color = meta.textColor;
+    }
+
+    const isEditing = Boolean(document.getElementById('editing-campaign-id')?.value);
+    const modeTitleEl = document.getElementById('form-mode-title');
+    if (modeTitleEl && !isEditing) {
+        modeTitleEl.innerText = CAMPAIGN_MODE_META[selectedMode].title;
+    }
+}
+
+function selectCampaignModeInForm(mode = 'normal') {
+    const selectedMode = ['normal', 'fortress', 'raid_boss'].includes(mode) ? mode : 'normal';
+    const typeSelect = document.getElementById('sponsor-campaign-type');
+    if (typeSelect) typeSelect.value = selectedMode;
+    switchCampaignModeFields(selectedMode);
+}
+
+function switchCampaignModeFields(mode = 'normal') {
+    const selectedMode = ['normal', 'fortress', 'raid_boss'].includes(mode) ? mode : 'normal';
+    const typeSelect = document.getElementById('sponsor-campaign-type');
+    if (typeSelect && typeSelect.value !== selectedMode) {
+        typeSelect.value = selectedMode;
+    }
+
+    updateModeSwitcherUI(selectedMode);
+
+    const isFortress = selectedMode === 'fortress';
+    const isRaidBoss = selectedMode === 'raid_boss';
+    const needsCheckinRadius = isFortress || isRaidBoss;
+
+    const fortressBox = document.getElementById('fortress-node-fields');
+    const secretRow = document.getElementById('secret-node-option-row');
+    const raidWrapper = document.getElementById('raid-boss-fields-wrapper');
+    const raidCb = document.getElementById('sponsor-is-raid');
+    const raidFields = document.getElementById('raid-boss-fields');
+
+    if (fortressBox) fortressBox.style.display = needsCheckinRadius ? 'block' : 'none';
+    if (secretRow) secretRow.style.display = isFortress ? 'flex' : 'none';
+    if (raidWrapper) raidWrapper.style.display = isRaidBoss ? 'block' : 'none';
+    if (raidCb) raidCb.checked = isRaidBoss;
+
+    if (raidFields) {
+        raidFields.style.display = isRaidBoss ? 'flex' : 'none';
+    } else if (typeof toggleRaidBossFields === 'function') {
+        toggleRaidBossFields();
+    }
+
+    if (typeof merchantMiniMap !== 'undefined' && merchantMiniMap && typeof merchantMiniMap.invalidateSize === 'function') {
+        setTimeout(() => merchantMiniMap.invalidateSize(), 60);
+    }
+}
+
+// ==========================================
+// 📍 ศูนย์รวมข้อมูลร้านค้าและพิกัดตั้งต้นของผู้ประกอบการ
+// ==========================================
+
+async function loadMerchantStoreProfile(forceRefresh = false) {
+    if (!forceRefresh && cachedMerchantStoreInfo) {
+        return cachedMerchantStoreInfo;
+    }
+
+    const fallback = {
+        storeName: '',
+        bannerUrl: '',
+        lat: 13.7367,
+        lng: 100.5231
+    };
+
+    const userId = await resolveMerchantUserId();
+    if (!userId || typeof supabaseClient === 'undefined' || !supabaseClient) {
+        return fallback;
+    }
+
+    let info = { ...fallback };
+
+    try {
+        const { data: storeData } = await supabaseClient
+            .from('store_profiles')
+            .select('banner_url, store_name, lat, lng')
+            .eq('merchant_id', userId)
+            .maybeSingle();
+
+        if (storeData) {
+            info.storeName = storeData.store_name || '';
+            info.bannerUrl = storeData.banner_url || '';
+            if (Number.isFinite(Number(storeData.lat)) && Number.isFinite(Number(storeData.lng))) {
+                info.lat = Number(storeData.lat);
+                info.lng = Number(storeData.lng);
+            }
+        }
+    } catch (err) {
+        console.warn('ไม่สามารถดึงข้อมูลจาก store_profiles:', err);
+    }
+
+    if (info.lat === fallback.lat && info.lng === fallback.lng) {
+        try {
+            const { data: latestCamp } = await supabaseClient
+                .from('campaigns')
+                .select('lat, lng')
+                .eq('created_by', userId)
+                .not('lat', 'is', null)
+                .not('lng', 'is', null)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (latestCamp && Number.isFinite(Number(latestCamp.lat)) && Number.isFinite(Number(latestCamp.lng))) {
+                info.lat = Number(latestCamp.lat);
+                info.lng = Number(latestCamp.lng);
+            }
+        } catch (err) {
+            console.warn('ไม่สามารถดึงพิกัดตั้งต้นจากแคมเปญล่าสุด:', err);
+        }
+    }
+
+    cachedMerchantStoreInfo = info;
+    return info;
+}
+
+function setMerchantCoordsAndMap(lat, lng) {
+    const latInput = document.getElementById('sponsor-lat');
+    const lngInput = document.getElementById('sponsor-lng');
+    if (latInput) latInput.value = lat;
+    if (lngInput) lngInput.value = lng;
+
+    if (typeof initMerchantMiniMap === 'function') {
+        setTimeout(() => initMerchantMiniMap(lat, lng), 80);
+    }
+}
+
+async function applyStoreDefaultLocation(notifyUser = false) {
+    const info = await loadMerchantStoreProfile();
+    setMerchantCoordsAndMap(info.lat, info.lng);
+    if (notifyUser) {
+        notifyMerchant('🏪 ตั้งค่าพิกัดร้านตั้งต้นเรียบร้อยแล้ว');
+    }
+    return { lat: info.lat, lng: info.lng };
+}
+
+function getCurrentLocationForSponsor() {
+    if (!navigator.geolocation) {
+        notifyMerchant('⚠️ อุปกรณ์ไม่รองรับการระบุตำแหน่ง GPS');
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = Number(pos.coords.latitude.toFixed(6));
+            const lng = Number(pos.coords.longitude.toFixed(6));
+            setMerchantCoordsAndMap(lat, lng);
+            notifyMerchant('📍 อัปเดตพิกัดจากตำแหน่งปัจจุบันแล้ว');
+        },
+        (err) => {
+            notifyMerchant('❌ ระบุตำแหน่งไม่สำเร็จ: ' + err.message);
+        }
+    );
+}
+
+async function resetMerchantMiniMap() {
+    await applyStoreDefaultLocation(true);
+}
+
+function buildCampaignPayload(selectedMode, formValues) {
+    const isFortress = selectedMode === 'fortress';
+    const isRaidBoss = selectedMode === 'raid_boss';
+
+    return {
+        title: formValues.title,
+        category: formValues.category,
+        reward_details: formValues.reward,
+        points_cost: formValues.pointsCost,
+        total_limit: formValues.totalLimit,
+        start_date: formValues.startDate,
+        end_date: formValues.endDate,
+        description: formValues.description,
+        merchant_name: formValues.merchantName !== '' ? formValues.merchantName : null,
+        sponsor_id: formValues.sponsorId,
+        campaign_type: selectedMode,
+        lat: Number.isFinite(formValues.lat) ? formValues.lat : null,
+        lng: Number.isFinite(formValues.lng) ? formValues.lng : null,
+        node_radius: (isFortress || isRaidBoss) ? (formValues.nodeRadius || 50) : 50,
+        is_secret_node: isFortress ? Boolean(formValues.isSecretNode) : false,
+        is_raid_boss: isRaidBoss,
+        boss_name: isRaidBoss ? (formValues.bossName || formValues.title) : null,
+        target_distance_km: isRaidBoss ? (formValues.targetDistKm || 10) : null,
+        min_distance_km: isRaidBoss ? (Number.isFinite(formValues.minDistKm) ? formValues.minDistKm : 1) : null,
+        claim_window_hours: isRaidBoss ? (Number.isFinite(formValues.claimWindowHours) && formValues.claimWindowHours > 0 ? formValues.claimWindowHours : 2) : null
+    };
+}
+
+// ==========================================
+// 📋 รายการแคมเปญของผู้ประกอบการ
+// ==========================================
+
 async function openSponsorForm() {
     const modal = document.getElementById('sponsor-form-modal');
     if (modal) modal.style.display = 'flex';
-    
-    document.getElementById('campaign-list-view').style.display = 'block';
-    document.getElementById('campaign-form-view').style.display = 'none';
+
+    const listView = document.getElementById('campaign-list-view');
+    const formView = document.getElementById('campaign-form-view');
+    if (listView) listView.style.display = 'block';
+    if (formView) formView.style.display = 'none';
 
     await loadMerchantCampaigns();
 }
@@ -45,12 +363,20 @@ function closeSponsorForm() {
     if (form) form.reset();
 }
 
-// ฟังก์ชันดึงแคมเปญที่ผู้ประกอบการ (created_by) สร้างขึ้นมาแสดงในรายการจัดการ
+function backToCampaignList() {
+    const formView = document.getElementById('campaign-form-view');
+    const listView = document.getElementById('campaign-list-view');
+    if (formView) formView.style.display = 'none';
+    if (listView) listView.style.display = 'block';
+    loadMerchantCampaigns();
+}
+
 async function loadMerchantCampaigns() {
     const container = document.getElementById('merchant-campaigns-container');
     if (!container) return;
 
-    if (!currentUser || !currentUser.id) {
+    const userId = await resolveMerchantUserId();
+    if (!userId) {
         container.innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px;">กรุณาล็อกอินก่อนจัดการแคมเปญ</div>`;
         return;
     }
@@ -61,7 +387,7 @@ async function loadMerchantCampaigns() {
         const { data: campaigns, error } = await supabaseClient
             .from('campaigns')
             .select('*')
-            .eq('created_by', currentUser.id)
+            .eq('created_by', userId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -71,38 +397,44 @@ async function loadMerchantCampaigns() {
                 <div style="text-align:center; color:#9ca3af; padding:30px 0;">
                     <div style="font-size:32px; margin-bottom:8px;">🏷️</div>
                     <div style="font-size:13px;">คุณยังไม่มีแคมเปญในระบบ</div>
-                    <div style="font-size:11px; margin-top:4px;">กดปุ่ม "+ เพิ่มแคมเปญ" มุมขวาบนเพื่อสร้างได้เลย</div>
+                    <div style="font-size:11px; margin-top:4px;">เลือกปุ่มประเภทแคมเปญด้านบนเพื่อสร้างได้เลย</div>
                 </div>`;
             return;
         }
 
-        let html = '';
-        campaigns.forEach(camp => {
+        container.innerHTML = campaigns.map((camp) => {
             const title = camp.title || 'แคมเปญไม่มีชื่อ';
             const reward = camp.reward_details || '-';
             const limit = camp.total_limit || 10;
             const claimed = camp.claimed_count || 0;
             const points = camp.points_cost || 0;
-            
+            const mode = detectCampaignMode(camp);
+
+            const modeBadge = mode === 'raid_boss'
+                ? `<span style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; padding:2px 6px; border-radius:6px; font-size:10px; font-weight:700;">🐲 เรดบอส</span>`
+                : mode === 'fortress'
+                    ? `<span style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; padding:2px 6px; border-radius:6px; font-size:10px; font-weight:700;">🏰 ป้อมปราการ</span>`
+                    : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:2px 6px; border-radius:6px; font-size:10px; font-weight:700;">🏷️ แคมเปญปกติ</span>`;
+
             const campString = encodeURIComponent(JSON.stringify(camp));
 
-            html += `
+            return `
                 <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <div style="flex:1; overflow:hidden;">
-                        <div style="font-size:14px; font-weight:700; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</div>
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                            ${modeBadge}
+                            <div style="font-size:14px; font-weight:700; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</div>
+                        </div>
                         <div style="font-size:11px; color:#4b5563; margin-top:2px;">🎁 สิทธิ์: ${reward}</div>
                         <div style="font-size:11px; color:#6b7280; margin-top:2px;">🪙 ใช้ ${points} Points | 📊 ใช้ไป ${claimed}/${limit} สิทธิ์</div>
                     </div>
                     <div style="display:flex; gap:6px; flex-shrink:0;">
-                        <button onclick='openEditCampaignForm("${campString}")' style="background:#3b82f6; color:white; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">✏️ แก้ไข</button>
-                        <button onclick='confirmDeleteCampaign("${camp.id}")' style="background:#ef4444; color:white; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">🗑️ ลบ</button>
+                        <button type="button" onclick='openEditCampaignForm("${campString}")' style="background:#3b82f6; color:white; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">✏️ แก้ไข</button>
+                        <button type="button" onclick='confirmDeleteCampaign("${camp.id}")' style="background:#ef4444; color:white; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">🗑️ ลบ</button>
                     </div>
                 </div>
             `;
-        });
-
-        container.innerHTML = html;
-
+        }).join('');
     } catch (err) {
         console.error('Error loading merchant campaigns:', err);
         container.innerHTML = `<div style="text-align:center; color:red; padding:20px;">ไม่สามารถโหลดรายการแคมเปญได้</div>`;
@@ -110,30 +442,28 @@ async function loadMerchantCampaigns() {
 }
 
 // ==========================================
-// 🛠️ ส่วนฟังก์ชันอัปโหลดแบนเนอร์และจัดการฟอร์มแคมเปญ (ฉบับสมบูรณ์)
+// 🛠️ อัปโหลดแบนเนอร์และจัดการฟอร์มสร้าง/แก้ไขแคมเปญ
 // ==========================================
 
-// 1. ฟังก์ชันอัปโหลดแบนเนอร์ร้านค้าไปยัง Supabase Storage พร้อมบันทึกข้อมูลตาราง store_profiles ให้ครบถ้วน
 async function uploadStoreBanner(storeId, fileInput) {
-    if (!currentUser || !currentUser.id) {
-        showToast('⚠️ กรุณาล็อกอินก่อนอัปโหลดแบนเนอร์');
+    const userId = await resolveMerchantUserId();
+    if (!userId) {
+        notifyMerchant('⚠️ กรุณาล็อกอินก่อนอัปโหลดแบนเนอร์');
         return;
     }
 
-    const file = fileInput.files[0];
+    const file = fileInput?.files?.[0];
     if (!file) {
         alert('กรุณาเลือกไฟล์รูปภาพแบนเนอร์ก่อนครับ');
         return;
     }
 
     try {
-        showToast('⏳ กำลังอัปโหลดแบนเนอร์...');
+        notifyMerchant('⏳ กำลังอัปโหลดแบนเนอร์...');
         const fileExt = file.name.split('.').pop();
-        const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const filePath = `${userId}_${Date.now()}.${fileExt}`;
 
-        // 1. อัปโหลดรูปขึ้น Supabase Storage (bucket: store-banners)
-        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+        const { error: uploadError } = await supabaseClient.storage
             .from('store-banners')
             .upload(filePath, file, { upsert: true });
 
@@ -144,87 +474,75 @@ async function uploadStoreBanner(storeId, fileInput) {
             .getPublicUrl(filePath);
 
         const bannerUrl = publicUrlData.publicUrl;
+        const storeNameVal = document.getElementById('sponsor-merchant-name')?.value.trim() || '';
 
-        // 2. ดึงค่าชื่อร้านจากฟอร์ม (ถ้ามี) เพื่อใช้บันทึกร่วมกัน
-        const storeNameInput = document.getElementById('sponsor-merchant-name');
-        let storeNameVal = storeNameInput ? storeNameInput.value.trim() : '';
-
-        // 3. เตรียมข้อมูล Upsert ให้ครบถ้วนทุกคอลัมน์ที่จำเป็นป้องกันค่าว่าง (Null)
-        const upsertData = { 
-            id: storeId || currentUser.id, 
-            merchant_id: currentUser.id,
-            banner_url: bannerUrl 
+        const upsertData = {
+            id: storeId || userId,
+            merchant_id: userId,
+            banner_url: bannerUrl
         };
-        
-        if (storeNameVal) {
-            upsertData.store_name = storeNameVal;
-        }
+        if (storeNameVal) upsertData.store_name = storeNameVal;
 
-        // 4. บันทึกลงตาราง store_profiles
         const { error: updateError } = await supabaseClient
             .from('store_profiles')
             .upsert(upsertData);
 
         if (updateError) throw updateError;
 
-        showToast('✅ อัปโหลดแบนเนอร์สำเร็จ!');
-        
-        // 5. อัปเดตพรีวิวรูปบนหน้าจอทันที
-        const previewImg = document.getElementById('current-banner-img');
-        if (previewImg) {
-            previewImg.src = bannerUrl;
-        }
+        cachedMerchantStoreInfo = {
+            ...(cachedMerchantStoreInfo || {}),
+            bannerUrl,
+            storeName: storeNameVal || cachedMerchantStoreInfo?.storeName || ''
+        };
 
+        const previewImg = document.getElementById('current-banner-img');
+        if (previewImg) previewImg.src = bannerUrl;
+
+        notifyMerchant('✅ อัปโหลดแบนเนอร์สำเร็จ!');
     } catch (error) {
         console.error('เกิดข้อผิดพลาดในการอัปโหลดแบนเนอร์:', error.message);
         alert('อัปโหลดไม่สำเร็จ: ' + error.message);
     }
 }
 
-// 2. เปิดฟอร์มสำหรับ "เพิ่มแคมเปญใหม่" (พร้อมดึงแบนเนอร์ล่าสุดจาก store_profiles มาแสดง)
-async function openCreateCampaignForm() {
-    document.getElementById('campaign-list-view').style.display = 'none';
-    document.getElementById('campaign-form-view').style.display = 'block';
-    document.getElementById('form-mode-title').innerText = '✨ เพิ่มแคมเปญใหม่';
-    
-    const form = document.getElementById('add-sponsor-form');
-    if (form) form.reset();
-    document.getElementById('editing-campaign-id').value = '';
-
-    // ดึงรูปแบนเนอร์ล่าสุดจากตาราง store_profiles มาแสดงที่พรีวิวเสมอ
-    try {
-        if (currentUser && currentUser.id) {
-            const { data: storeData } = await supabaseClient
-                .from('store_profiles')
-                .select('banner_url, store_name')
-                .eq('merchant_id', currentUser.id)
-                .maybeSingle();
-
-            if (storeData) {
-                if (storeData.banner_url) {
-                    const previewImg = document.getElementById('current-banner-img');
-                    if (previewImg) previewImg.src = storeData.banner_url;
-                }
-                if (storeData.store_name) {
-                    const storeNameInput = document.getElementById('sponsor-merchant-name');
-                    if (storeNameInput && !storeNameInput.value) {
-                        storeNameInput.value = storeData.store_name;
-                    }
-                }
-            }
-        }
-    } catch (err) {
-        console.error('ไม่สามารถโหลดข้อมูลแบนเนอร์ร้านค้าได้:', err);
+function syncStoreInfoToForm(storeInfo, fallbackMerchantName = '') {
+    if (storeInfo?.bannerUrl) {
+        const previewImg = document.getElementById('current-banner-img');
+        if (previewImg) previewImg.src = storeInfo.bannerUrl;
     }
-
-    setTimeout(() => {
-      initMerchantMiniMap(13.7367, 100.5231);
-    }, 100);
+    const storeNameInput = document.getElementById('sponsor-merchant-name');
+    if (storeNameInput && !storeNameInput.value) {
+        storeNameInput.value = fallbackMerchantName || storeInfo?.storeName || '';
+    }
 }
 
-// 3. เปิดฟอร์มสำหรับ "แก้ไขแคมเปญเดิม" (พร้อมดึงแบนเนอร์ล่าสุดจาก store_profiles มาแสดงเช่นกัน)
+async function openCreateCampaignForm(mode = 'normal') {
+    const selectedMode = ['normal', 'fortress', 'raid_boss'].includes(mode) ? mode : 'normal';
+
+    document.getElementById('campaign-list-view').style.display = 'none';
+    document.getElementById('campaign-form-view').style.display = 'block';
+
+    const form = document.getElementById('add-sponsor-form');
+    if (form) form.reset();
+
+    document.getElementById('editing-campaign-id').value = '';
+    if (document.getElementById('sponsor-radius')) document.getElementById('sponsor-radius').value = 50;
+    if (document.getElementById('sponsor-is-secret')) document.getElementById('sponsor-is-secret').checked = (selectedMode === 'fortress');
+    if (document.getElementById('sponsor-boss-name')) document.getElementById('sponsor-boss-name').value = '';
+    if (document.getElementById('sponsor-target-dist')) document.getElementById('sponsor-target-dist').value = 10;
+    if (document.getElementById('sponsor-min-dist')) document.getElementById('sponsor-min-dist').value = 1;
+    if (document.getElementById('sponsor-claim-hours')) document.getElementById('sponsor-claim-hours').value = 2;
+
+    selectCampaignModeInForm(selectedMode);
+
+    const storeInfo = await loadMerchantStoreProfile();
+    syncStoreInfoToForm(storeInfo);
+    setMerchantCoordsAndMap(storeInfo.lat, storeInfo.lng);
+}
+
 async function openEditCampaignForm(campEncodedStr) {
     const camp = JSON.parse(decodeURIComponent(campEncodedStr));
+    const detectedMode = detectCampaignMode(camp);
 
     document.getElementById('campaign-list-view').style.display = 'none';
     document.getElementById('campaign-form-view').style.display = 'block';
@@ -240,74 +558,49 @@ async function openEditCampaignForm(campEncodedStr) {
     document.getElementById('sponsor-start-date').value = camp.start_date ? camp.start_date.split('T')[0] : '';
     document.getElementById('sponsor-end-date').value = camp.end_date ? camp.end_date.split('T')[0] : '';
     document.getElementById('sponsor-desc').value = camp.description || '';
-
-    document.getElementById('sponsor-lat').value = camp.lat || '';
-    document.getElementById('sponsor-lng').value = camp.lng || '';
     document.getElementById('sponsor-radius').value = camp.node_radius || 50;
-    
-    const secretCb = document.getElementById('sponsor-is-secret');
-    if (secretCb) secretCb.checked = Boolean(camp.is_secret_node);
-    
-    const raidCb = document.getElementById('sponsor-is-raid');
-    if (raidCb) raidCb.checked = Boolean(camp.is_raid_boss);
-    
-    const bossInput = document.getElementById('sponsor-boss-name');
-    if (bossInput) bossInput.value = camp.boss_name || '';
-    
-    const targetDistInput = document.getElementById('sponsor-target-dist');
-    if (targetDistInput) targetDistInput.value = camp.target_distance_km ?? 500;
-    
-    toggleRaidBossFields();
 
-    // ดึงรูปแบนเนอร์ล่าสุดจากตาราง store_profiles มาแสดงที่พรีวิวเสมอ
-    try {
-        if (currentUser && currentUser.id) {
-            const { data: storeData } = await supabaseClient
-                .from('store_profiles')
-                .select('banner_url')
-                .eq('merchant_id', currentUser.id)
-                .maybeSingle();
-
-            if (storeData && storeData.banner_url) {
-                const previewImg = document.getElementById('current-banner-img');
-                if (previewImg) previewImg.src = storeData.banner_url;
-            }
-        }
-    } catch (err) {
-        console.error('ไม่สามารถโหลดข้อมูลแบนเนอร์ร้านค้าได้:', err);
+    if (document.getElementById('sponsor-is-secret')) {
+        document.getElementById('sponsor-is-secret').checked = Boolean(camp.is_secret_node);
+    }
+    if (document.getElementById('sponsor-is-raid')) {
+        document.getElementById('sponsor-is-raid').checked = Boolean(camp.is_raid_boss);
+    }
+    if (document.getElementById('sponsor-boss-name')) {
+        document.getElementById('sponsor-boss-name').value = camp.boss_name || '';
+    }
+    if (document.getElementById('sponsor-target-dist')) {
+        document.getElementById('sponsor-target-dist').value = camp.target_distance_km ?? 10;
+    }
+    if (document.getElementById('sponsor-min-dist')) {
+        document.getElementById('sponsor-min-dist').value = camp.min_distance_km ?? 1;
+    }
+    if (document.getElementById('sponsor-claim-hours')) {
+        document.getElementById('sponsor-claim-hours').value = camp.claim_window_hours ?? 2;
     }
 
-    const lat = camp.lat || 13.7367;
-    const lng = camp.lng || 100.5231;
-    setTimeout(() => {
-        initMerchantMiniMap(lat, lng);
-    }, 100);
+    selectCampaignModeInForm(detectedMode);
+
+    const storeInfo = await loadMerchantStoreProfile();
+    syncStoreInfoToForm(storeInfo, camp.merchant_name || '');
+
+    const lat = Number.isFinite(Number(camp.lat)) ? Number(camp.lat) : storeInfo.lat;
+    const lng = Number.isFinite(Number(camp.lng)) ? Number(camp.lng) : storeInfo.lng;
+    setMerchantCoordsAndMap(lat, lng);
 }
 
-// ปุ่มกดกลับไปหน้ารายการ
-function backToCampaignList() {
-    document.getElementById('campaign-form-view').style.display = 'none';
-    document.getElementById('campaign-list-view').style.display = 'block';
-    loadMerchantCampaigns();
-}
-
-// ==========================================
-// 📝 ฟังก์ชันบันทึกแคมเปญ (พร้อมระบบ Upsert สปอนเซอร์อัตโนมัติ ป้องกัน Error Foreign Key)
-// ==========================================
 async function handleSaveCampaign(event) {
     event.preventDefault();
-    if (!currentUser) {
-        showToast('⚠️ กรุณาล็อกอินก่อนบันทึกข้อมูล');
+    const sponsorId = await resolveMerchantUserId();
+    if (!sponsorId) {
+        notifyMerchant('⚠️ กรุณาล็อกอินก่อนบันทึกข้อมูล');
         return;
     }
 
     try {
         const campaignId = document.getElementById('editing-campaign-id').value;
         const isEditing = campaignId !== '';
-
-        showToast(isEditing ? '⏳ กำลังอัปเดตแคมเปญ...' : '⏳ กำลังสร้างแคมเปญ...');
-
-        const sponsorId = currentUser.id;
+        const selectedMode = document.getElementById('sponsor-campaign-type')?.value || 'normal';
 
         const title = document.getElementById('sponsor-title').value.trim();
         const category = document.getElementById('sponsor-category').value;
@@ -317,68 +610,85 @@ async function handleSaveCampaign(event) {
         const startDate = document.getElementById('sponsor-start-date').value;
         const endDate = document.getElementById('sponsor-end-date').value;
         const description = document.getElementById('sponsor-desc').value.trim();
-        const merchantNameInput = document.getElementById('sponsor-merchant-name');
-        const merchantName = merchantNameInput ? merchantNameInput.value.trim() : '';
-        
-        const imageFileInput = document.getElementById('sponsor-image-file');
-        let imageUrl = '';
-        if (imageFileInput && imageFileInput.files && imageFileInput.files[0]) {
-            imageUrl = await compressImageFile(imageFileInput.files[0]);
+        const merchantName = document.getElementById('sponsor-merchant-name')?.value.trim() || '';
+
+        const storeInfo = await loadMerchantStoreProfile();
+        let lat = parseFloat(document.getElementById('sponsor-lat').value);
+        let lng = parseFloat(document.getElementById('sponsor-lng').value);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            lat = storeInfo.lat;
+            lng = storeInfo.lng;
         }
 
-        const lat = parseFloat(document.getElementById('sponsor-lat').value) || null;
-        const lng = parseFloat(document.getElementById('sponsor-lng').value) || null;
         const nodeRadius = parseInt(document.getElementById('sponsor-radius').value, 10) || 50;
+        const isSecretNode = Boolean(document.getElementById('sponsor-is-secret')?.checked);
+        const bossName = document.getElementById('sponsor-boss-name')?.value.trim() || '';
+        const targetDistKm = parseFloat(document.getElementById('sponsor-target-dist')?.value);
+        const minDistKm = parseFloat(document.getElementById('sponsor-min-dist')?.value);
+        const claimWindowHours = parseInt(document.getElementById('sponsor-claim-hours')?.value, 10);
 
-        const bossNameInput = document.getElementById('sponsor-boss-name');
-        const bossName = bossNameInput ? bossNameInput.value.trim() : '';
+        if (selectedMode === 'raid_boss') {
+            if (!bossName) {
+                notifyMerchant('⚠️ กรุณากรอกชื่อตัวบอส / กิจกรรม');
+                return;
+            }
+            if (!Number.isFinite(targetDistKm) || targetDistKm <= 0) {
+                notifyMerchant('⚠️ กรุณาระบุระยะทางเป้าหมายรวม (กม.) ให้มากกว่า 0');
+                return;
+            }
+            if (!Number.isFinite(minDistKm) || minDistKm < 0) {
+                notifyMerchant('⚠️ กรุณาระบุระยะทางขั้นต่ำของผู้เล่น (กม.) ให้ถูกต้อง');
+                return;
+            }
+        }
 
-        const secretNodeCb = document.getElementById('sponsor-is-secret');
-        const isSecretNode = secretNodeCb ? secretNodeCb.checked : false;
+        notifyMerchant(isEditing ? '⏳ กำลังอัปเดตแคมเปญ...' : '⏳ กำลังสร้างแคมเปญ...');
 
-        const raidBossCb = document.getElementById('sponsor-is-raid');
-        const isRaidBoss = raidBossCb ? raidBossCb.checked : false;
+        const imageFile = document.getElementById('sponsor-image-file')?.files?.[0];
+        const imageUrl = imageFile ? await compressImageFile(imageFile) : '';
 
-        const targetDistInput = document.getElementById('sponsor-target-dist');
-        const targetDistKm = targetDistInput ? parseFloat(targetDistInput.value) || 500 : 500;
-
-        // 💡 1. ระบบอัตโนมัติ: บันทึกหรืออัปเดตข้อมูลโปรไฟล์สปอนเซอร์ลงในตาราง sponsors ก่อน
-        // เพื่อให้มี ID รองรับ Foreign Key ของตาราง campaigns เสมอโดยไม่ต้องเพิ่มข้อมูลเอง
+        const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : 'ร้านค้าสปอนเซอร์';
         const { error: sponsorUpsertError } = await supabaseClient
             .from('sponsors')
             .upsert([{
                 id: sponsorId,
-                name: merchantName || currentUser.email || 'ร้านค้าสปอนเซอร์',
+                name: merchantName || userEmail,
                 description: description || 'รายละเอียดร้านค้า',
                 banner_url: imageUrl || null,
                 status: 'active'
             }], { onConflict: 'id' });
 
         if (sponsorUpsertError) {
-            console.error('Error auto-upserting sponsor:', sponsorUpsertError);
             throw new Error(sponsorUpsertError.message || 'ไม่สามารถอัปเดตข้อมูลสปอนเซอร์ได้');
         }
 
-        // 2. จัดเตรียมข้อมูลสำหรับบันทึกแคมเปญ
-        const campaignData = {
+        cachedMerchantStoreInfo = {
+            ...(cachedMerchantStoreInfo || {}),
+            storeName: merchantName || cachedMerchantStoreInfo?.storeName || '',
+            lat,
+            lng
+        };
+
+        const campaignData = buildCampaignPayload(selectedMode, {
+            sponsorId,
             title,
             category,
-            reward_details: reward,
-            points_cost: pointsCost, 
-            total_limit: totalLimit,
-            start_date: startDate,
-            end_date: endDate,
+            reward,
+            pointsCost,
+            totalLimit,
+            startDate,
+            endDate,
             description,
-            merchant_name: merchantName !== '' ? merchantName : null,
+            merchantName,
             lat,
             lng,
-            node_radius: nodeRadius,
-            is_secret_node: isSecretNode,
-            is_raid_boss: isRaidBoss,
-            boss_name: isRaidBoss ? bossName : null,
-            target_distance_km: isRaidBoss ? targetDistKm : null,
-            sponsor_id: sponsorId // ผูก sponsor_id ตรงกับ ID ผู้ใช้ปัจจุบัน
-        };
+            nodeRadius,
+            isSecretNode,
+            bossName,
+            targetDistKm,
+            minDistKm,
+            claimWindowHours
+        });
 
         if (imageUrl) {
             campaignData.image_url = imageUrl;
@@ -389,11 +699,10 @@ async function handleSaveCampaign(event) {
                 .from('campaigns')
                 .update(campaignData)
                 .eq('id', campaignId);
-
             if (error) throw error;
-            showToast('🎉 อัปเดตแคมเปญสำเร็จ!');
+            notifyMerchant('🎉 อัปเดตแคมเปญสำเร็จ!');
         } else {
-            campaignData.created_by = currentUser.id;
+            campaignData.created_by = sponsorId;
             campaignData.claimed_count = 0;
             campaignData.status = 'active';
             campaignData.is_active = true;
@@ -401,45 +710,49 @@ async function handleSaveCampaign(event) {
             const { error } = await supabaseClient
                 .from('campaigns')
                 .insert([campaignData]);
-
             if (error) throw error;
-            showToast('🎉 สร้างแคมเปญสปอนเซอร์สำเร็จ!');
+            notifyMerchant('🎉 สร้างแคมเปญสปอนเซอร์สำเร็จ!');
         }
 
         backToCampaignList();
-        await loadShopDataToUI('all');
-
+        if (typeof loadShopDataToUI === 'function') await loadShopDataToUI('all');
+        if (typeof loadSponsorNodesOnMap === 'function') await loadSponsorNodesOnMap();
     } catch (err) {
         console.error('Error saving campaign:', err);
-        showToast('❌ ไม่สามารถบันทึกข้อมูลได้: ' + (err.message || 'เกิดข้อผิดพลาด'));
+        notifyMerchant('❌ ไม่สามารถบันทึกข้อมูลได้: ' + (err.message || 'เกิดข้อผิดพลาด'));
     }
 }
 
-// ฟังก์ชันลบแคมเปญ (DELETE)
 async function confirmDeleteCampaign(campaignId) {
     if (!confirm('🗑️ คุณแน่ใจหรือไม่ว่าต้องการลบแคมเปญนี้? ระบบจะคืนพอยต์และแจ้งเตือนผู้ใช้ที่รับสิทธิ์ไปแล้วโดยอัตโนมัติ การกระทำนี้ไม่สามารถย้อนกลับได้')) {
         return;
     }
 
+    const userId = await resolveMerchantUserId();
+    if (!userId) {
+        notifyMerchant('⚠️ กรุณาล็อกอินก่อนลบแคมเปญ');
+        return;
+    }
+
     try {
-        showToast('⏳ กำลังลบแคมเปญและดำเนินการคืนพอยต์...');
+        notifyMerchant('⏳ กำลังลบแคมเปญและดำเนินการคืนพอยต์...');
 
         const { error } = await supabaseClient
             .from('campaigns')
             .delete()
             .eq('id', campaignId)
-            .eq('created_by', currentUser.id);
+            .eq('created_by', userId);
 
         if (error) throw error;
 
-        showToast('🗑️ ลบแคมเปญและคืนพอยต์ให้ผู้ใช้งานเรียบร้อยแล้ว');
-        
-        await loadMerchantCampaigns();
-        await loadShopDataToUI('all');
+        notifyMerchant('🗑️ ลบแคมเปญและคืนพอยต์ให้ผู้ใช้งานเรียบร้อยแล้ว');
 
+        await loadMerchantCampaigns();
+        if (typeof loadShopDataToUI === 'function') await loadShopDataToUI('all');
+        if (typeof loadSponsorNodesOnMap === 'function') await loadSponsorNodesOnMap();
     } catch (err) {
         console.error('Error deleting campaign:', err);
-        showToast('❌ ไม่สามารถลบแคมเปญได้: ' + (err.message || 'เกิดข้อผิดพลาด'));
+        notifyMerchant('❌ ไม่สามารถลบแคมเปญได้: ' + (err.message || 'เกิดข้อผิดพลาด'));
     }
 }
 
@@ -461,22 +774,26 @@ function compressImageFile(file) {
                 }
                 canvas.width = width;
                 canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
                 resolve(canvas.toDataURL('image/jpeg', 0.75));
             };
         };
     });
 }
 
+// ==========================================
+// 📷 ตรวจสอบ/สแกน QR คูปอง และประวัติการใช้สิทธิ์
+// ==========================================
+
 async function merchantRedeemCoupon(couponCode) {
-    if (!currentUser) {
-        showToast('⚠️ กรุณาล็อกอินก่อนใช้งานระบบผู้ประกอบการ');
+    const userId = await resolveMerchantUserId();
+    if (!userId) {
+        notifyMerchant('⚠️ กรุณาล็อกอินก่อนใช้งานระบบผู้ประกอบการ');
         return { success: false, message: 'กรุณาล็อกอินก่อนใช้งาน' };
     }
 
     try {
-        showToast('⏳ กำลังตรวจสอบรหัสคูปอง...');
+        notifyMerchant('⏳ กำลังตรวจสอบรหัสคูปอง...');
         const codeToSearch = couponCode.trim().toUpperCase();
 
         const { data: couponData, error: fetchError } = await supabaseClient
@@ -486,15 +803,15 @@ async function merchantRedeemCoupon(couponCode) {
             .maybeSingle();
 
         if (fetchError) throw fetchError;
-
         if (!couponData) {
-            showToast('❌ ไม่พบรหัสคูปองนี้ในระบบ');
-            return { success: false, message: 'ไม่พบรหัสคูปองนี้ในระบบ' };
+            const msg = 'ไม่พบรหัสคูปองนี้ในระบบ';
+            notifyMerchant('❌ ' + msg);
+            return { success: false, message: msg };
         }
-
         if (couponData.is_redeemed === true) {
-            showToast('⚠️ รหัสคูปองนี้ถูกใช้งานไปแล้วเรียบร้อยครับ');
-            return { success: false, message: 'รหัสคูปองนี้ถูกใช้งานไปแล้วเรียบร้อยครับ' };
+            const msg = 'รหัสคูปองนี้ถูกใช้งานไปแล้วเรียบร้อยครับ';
+            notifyMerchant('⚠️ ' + msg);
+            return { success: false, message: msg };
         }
 
         const { error: updateError } = await supabaseClient
@@ -505,58 +822,48 @@ async function merchantRedeemCoupon(couponCode) {
         if (updateError) throw updateError;
 
         const successMsg = `ใช้สิทธิ์สำเร็จ! รหัส ${codeToSearch} ถูกใช้งานเรียบร้อย`;
-        showToast(`✅ ${successMsg}`);
+        notifyMerchant('✅ ' + successMsg);
         return { success: true, message: successMsg };
-
     } catch (err) {
         console.error('Error redeeming coupon:', err);
         const errorMsg = err.message || 'ไม่สามารถใช้งานได้ในขณะนี้';
-        showToast('❌ เกิดข้อผิดพลาด: ' + errorMsg);
+        notifyMerchant('❌ เกิดข้อผิดพลาด: ' + errorMsg);
         return { success: false, message: errorMsg };
     }
 }
 
 async function handleMerchantRedeemClick() {
-    const inputElement = document.getElementById('merchant-coupon-input'); 
+    const inputElement = document.getElementById('merchant-coupon-input');
     const couponCode = inputElement ? inputElement.value.trim() : '';
 
     if (!couponCode) {
-        showToast('⚠️ กรุณากรอกหรือสแกนรหัสคูปองก่อนครับ');
+        notifyMerchant('⚠️ กรุณากรอกหรือสแกนรหัสคูปองก่อนครับ');
         return;
     }
 
-    try {
-        const result = await merchantRedeemCoupon(couponCode);
-        if (result && result.success) {
-            showToast(`✅ ${result.message}`);
-            if (inputElement) inputElement.value = '';
-            if (typeof stopQRScanner === 'function') stopQRScanner();
-            if (currentUser && typeof loadMyCoupons === 'function') {
-                loadMyCoupons(currentUser.id);
-            }
-        } else {
-            showToast(`❌ ${result?.message || 'ไม่สามารถใช้สิทธิ์ได้'}`);
+    const result = await merchantRedeemCoupon(couponCode);
+    if (result && result.success) {
+        if (inputElement) inputElement.value = '';
+        stopQRScanner();
+        const userId = await resolveMerchantUserId();
+        if (userId && typeof loadMyCoupons === 'function') {
+            loadMyCoupons(userId);
         }
-    } catch (err) {
-        console.error('Error in merchant redeem click:', err);
-        showToast('❌ เกิดข้อผิดพลาด');
     }
 }
 
-let videoStream = null;
-let scanInterval = null;
-
 async function handleScanQRClick() {
     const qrContainer = document.getElementById('qr-reader-container');
-    if (qrContainer) qrContainer.style.display = 'block';
+    const readerDiv = document.getElementById('qr-reader');
+    if (!qrContainer || !readerDiv) return;
 
-    let readerDiv = document.getElementById('qr-reader');
+    qrContainer.style.display = 'block';
     readerDiv.innerHTML = '<video id="qr-video" autoplay playsinline style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px;"></video>';
     const videoElement = document.getElementById('qr-video');
 
     try {
-        videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        videoElement.srcObject = videoStream;
+        merchantVideoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        videoElement.srcObject = merchantVideoStream;
 
         if (!('BarcodeDetector' in window)) {
             alert('เบราว์เซอร์นี้ไม่รองรับการสแกน QR อัตโนมัติ กรุณาใช้การพิมพ์รหัสแทนครับ');
@@ -565,18 +872,19 @@ async function handleScanQRClick() {
         }
 
         const barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
-        scanInterval = setInterval(async () => {
+        merchantScanInterval = setInterval(async () => {
             if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
                 try {
                     const barcodes = await barcodeDetector.detect(videoElement);
                     if (barcodes.length > 0) {
-                        const scannedText = barcodes[0].rawValue;
                         const couponInput = document.getElementById('merchant-coupon-input');
-                        if (couponInput) couponInput.value = scannedText;
+                        if (couponInput) couponInput.value = barcodes[0].rawValue;
                         stopQRScanner();
-                        handleMerchantRedeemClick();
+                        await handleMerchantRedeemClick();
                     }
-                } catch (err) { console.error(err); }
+                } catch (err) {
+                    console.error(err);
+                }
             }
         }, 300);
     } catch (err) {
@@ -587,8 +895,14 @@ async function handleScanQRClick() {
 }
 
 function stopQRScanner() {
-    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-    if (videoStream) { videoStream.getTracks().forEach(track => track.stop()); videoStream = null; }
+    if (merchantScanInterval) {
+        clearInterval(merchantScanInterval);
+        merchantScanInterval = null;
+    }
+    if (merchantVideoStream) {
+        merchantVideoStream.getTracks().forEach((track) => track.stop());
+        merchantVideoStream = null;
+    }
     const qrContainer = document.getElementById('qr-reader-container');
     if (qrContainer) qrContainer.style.display = 'none';
     const readerDiv = document.getElementById('qr-reader');
@@ -615,7 +929,8 @@ async function fetchMerchantCouponHistory() {
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:16px; color:#6b7280;">กำลังโหลดข้อมูล...</td></tr>`;
 
     try {
-        if (!currentUser || !currentUser.id) {
+        const userId = await resolveMerchantUserId();
+        if (!userId) {
             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:16px; color:#ef4444;">กรุณาล็อกอินก่อนดูประวัติ</td></tr>`;
             return;
         }
@@ -623,7 +938,7 @@ async function fetchMerchantCouponHistory() {
         const { data: campaigns, error: campError } = await supabaseClient
             .from('campaigns')
             .select('id, title, created_by')
-            .eq('created_by', currentUser.id);
+            .eq('created_by', userId);
 
         if (campError) throw campError;
 
@@ -632,9 +947,8 @@ async function fetchMerchantCouponHistory() {
             return;
         }
 
-        const myCampaignIds = campaigns.map(c => c.id);
-        const campaignMap = new Map();
-        campaigns.forEach(c => campaignMap.set(c.id, c));
+        const myCampaignIds = campaigns.map((c) => c.id);
+        const campaignMap = new Map(campaigns.map((c) => [c.id, c]));
 
         const { data: filteredCoupons, error: ucError } = await supabaseClient
             .from('user_coupons')
@@ -649,19 +963,19 @@ async function fetchMerchantCouponHistory() {
             return;
         }
 
-        let htmlRows = '';
-        filteredCoupons.forEach(item => {
+        tbody.innerHTML = filteredCoupons.map((item) => {
             const isUsed = item.is_redeemed === true;
-            const statusBadge = isUsed 
-                ? `<span style="padding:3px 8px; background:#dcfce7; color:#15803d; border-radius:12px; font-size:11px; font-weight:600;">ใช้งานแล้ว</span>` 
+            const statusBadge = isUsed
+                ? `<span style="padding:3px 8px; background:#dcfce7; color:#15803d; border-radius:12px; font-size:11px; font-weight:600;">ใช้งานแล้ว</span>`
                 : `<span style="padding:3px 8px; background:#fef3c7; color:#b45309; border-radius:12px; font-size:11px; font-weight:600;">รอใช้งาน</span>`;
 
-            const camp = campaignMap.get(item.campaign_id) || {};
-            const campaignTitle = camp.title || 'แคมเปญของฉัน';
+            const campaignTitle = campaignMap.get(item.campaign_id)?.title || 'แคมเปญของฉัน';
             const targetTime = isUsed && item.redeemed_at ? item.redeemed_at : item.created_at;
-            const formatDate = targetTime ? new Date(targetTime).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+            const formatDate = targetTime
+                ? new Date(targetTime).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
+                : '-';
 
-            htmlRows += `
+            return `
                 <tr style="border-bottom:1px solid #f3f4f6;">
                     <td style="padding:10px 8px; font-family:monospace; font-weight:600;">${item.coupon_code || '-'}</td>
                     <td style="padding:10px 8px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${campaignTitle}">${campaignTitle}</td>
@@ -669,10 +983,14 @@ async function fetchMerchantCouponHistory() {
                     <td style="padding:10px 8px; color:#9ca3af; font-size:11px;">${formatDate}</td>
                 </tr>
             `;
-        });
-        tbody.innerHTML = htmlRows;
+        }).join('');
     } catch (err) {
         console.error(err);
         tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:16px; color:#ef4444;">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
     }
 }
+
+document.addEventListener('DOMContentLoaded', async () => {
+    bindMerchantAuthAutoCheck();
+    await checkMerchantPermission();
+});

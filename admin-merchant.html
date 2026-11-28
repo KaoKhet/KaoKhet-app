@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>จัดการคำขอผู้ประกอบการและรางวัลออนไลน์ — KaoKhet Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f3f4f6;
+            color: #111827;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1220px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            background: #ffffff;
+            padding: 20px 24px;
+            border-radius: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .header p {
+            margin: 4px 0 0;
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .main-sections {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .section-tab-btn {
+            padding: 10px 18px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            color: #374151;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .section-tab-btn.active {
+            background: #15803d;
+            color: #ffffff;
+            border-color: #15803d;
+        }
+
+        .section-panel {
+            display: none;
+        }
+
+        .section-panel.active {
+            display: block;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 9px 16px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            color: #374151;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .tab-btn.active {
+            background: #111827;
+            color: #ffffff;
+            border-color: #111827;
+        }
+
+        .btn {
+            padding: 7px 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #15803d;
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .btn-refresh {
+            background: #ffffff;
+            color: #111827;
+            border: 1px solid #d1d5db;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-approve {
+            background: #16a34a;
+            color: #fff;
+        }
+
+        .btn-cancel {
+            background: #f59e0b;
+            color: #fff;
+        }
+
+        .btn-delete {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        .form-card {
+            padding: 20px 24px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group.full {
+            grid-column: 1 / -1;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 13px;
+            font-family: inherit;
+            background: #ffffff;
+            color: #111827;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 860px;
+        }
+
+        th,
+        td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 13px;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f9fafb;
+            color: #4b5563;
+            font-weight: 700;
+        }
+
+        .mono {
+            font-family: monospace;
+            font-size: 12px;
+            color: #374151;
+            word-break: break-all;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .badge-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-completed {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-cancelled {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .thumb {
+            width: 56px;
+            height: 56px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            display: block;
+        }
+
+        .actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px 16px;
+            color: #6b7280;
+        }
+
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 24, 39, 0.55);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-backdrop.open {
+            display: flex;
+        }
+
+        .modal-box {
+            background: #ffffff;
+            width: 100%;
+            max-width: 540px;
+            border-radius: 16px;
+            padding: 22px 24px;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 17px;
+        }
+
+        .claim-summary {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 13px;
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🏪 แผงจัดการคำขอผู้ประกอบการและรางวัลออนไลน์</h1>
+                <p>จัดการคำขอผู้ประกอบการ (`merchant_requests`), สร้างของรางวัลออนไลน์ (`campaigns`)
+                    และปิดรายการแลกรางวัล (`reward_claims`)</p>
+            </div>
+            <div id="admin-status-text" style="font-size: 12px; color: #4b5563;">กำลังตรวจสอบเซสชัน...</div>
+        </div>
+
+        <div class="main-sections">
+            <button id="main-tab-merchants" class="section-tab-btn active" type="button"
+                onclick="switchMainSection('merchants')">
+                🏪 คำขอผู้ประกอบการ
+            </button>
+            <button id="main-tab-rewards" class="section-tab-btn" type="button" onclick="switchMainSection('rewards')">
+                🎁 สร้างของรางวัลออนไลน์
+            </button>
+            <button id="main-tab-claims" class="section-tab-btn" type="button" onclick="switchMainSection('claims')">
+                📦 คำขอแลกของรางวัล (<span id="count-claims-pending">0</span>)
+            </button>
+        </div>
+
+        <!-- ส่วนที่ 1: คำขอผู้ประกอบการ (คงโครงสร้างเดิมไว้ครบ) -->
+        <section id="section-merchants" class="section-panel active">
+            <div class="toolbar">
+                <div class="tabs">
+                    <button id="tab-pending" class="tab-btn active" type="button" onclick="switchAdminTab('pending')">
+                        ⏳ รออนุมัติ (<span id="count-pending">0</span>)
+                    </button>
+                    <button id="tab-approved" class="tab-btn" type="button" onclick="switchAdminTab('approved')">
+                        ✅ อนุมัติแล้ว (<span id="count-approved">0</span>)
+                    </button>
+                </div>
+                <button class="btn-refresh" type="button" onclick="loadMerchantRequests()">🔄 รีเฟรชข้อมูล</button>
+            </div>
+
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ชื่อร้านค้า</th>
+                            <th>ประเภท / พื้นที่</th>
+                            <th>ช่องทางติดต่อ</th>
+                            <th>User ID / ชื่อ</th>
+                            <th>หมายเหตุ</th>
+                            <th>วันที่ส่ง</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="merchant-requests-tbody">
+                        <tr>
+                            <td colspan="7" class="empty">กำลังโหลดข้อมูล...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ส่วนที่ 2: สร้างและจัดการของรางวัลออนไลน์ในตาราง campaigns -->
+        <section id="section-rewards" class="section-panel">
+            <div class="card form-card">
+                <h2 style="margin: 0 0 14px; font-size: 16px;">➕ สร้างของรางวัลออนไลน์ใหม่ (บันทึกลงตาราง campaigns)
+                </h2>
+                <form id="create-online-reward-form" onsubmit="handleCreateOnlineReward(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="reward-title">ชื่อรางวัล (title) *</label>
+                            <input id="reward-title" type="text" required placeholder="เช่น TrueMoney Wallet 50 บาท" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-type">ประเภทรางวัลออนไลน์ *</label>
+                            <select id="reward-type">
+                                <option value="truemoney">เติมเงินวอลเล็ต (truemoney)</option>
+                                <option value="code">โค้ด / บัญชีปลายทาง (code)</option>
+                                <option value="voucher">บัตรกำนัล / รางวัลออนไลน์ (voucher)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-merchant-name">ชื่อผู้ให้รางวัล / แบรนด์ (merchant_name)</label>
+                            <input id="reward-merchant-name" type="text" value="KaoKhet Online Reward" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-points-cost">พอยต์ที่ใช้แลก (points_cost) *</label>
+                            <input id="reward-points-cost" type="number" min="0" value="50" required />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-total-limit">จำนวนสิทธิ์ทั้งหมด (total_limit) *</label>
+                            <input id="reward-total-limit" type="number" min="1" value="10" required />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-category">หมวดหมู่ (category)</label>
+                            <input id="reward-category" type="text" value="online_reward" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-start-date">วันเริ่มต้น (start_date)</label>
+                            <input id="reward-start-date" type="datetime-local" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-end-date">วันหมดอายุ (end_date)</label>
+                            <input id="reward-end-date" type="datetime-local" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-image-file">อัปโหลดรูปภาพ (เก็บใน Bucket: store-banners)</label>
+                            <input id="reward-image-file" type="file" accept="image/*" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-image-url">หรือลิงก์รูปภาพ (image_url)</label>
+                            <input id="reward-image-url" type="url" placeholder="https://..." />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-details">รายละเอียดเงื่อนไข / ของรางวัล (reward_details)</label>
+                            <input id="reward-details" type="text"
+                                placeholder="เช่น โอนเงินเข้าเบอร์วอลเล็ตภายใน 24 ชม." />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reward-description">คำอธิบายเพิ่มเติม (description)</label>
+                            <input id="reward-description" type="text" placeholder="รายละเอียดแคมเปญรางวัลออนไลน์" />
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn-secondary" type="reset">ล้างฟอร์ม</button>
+                        <button id="btn-submit-reward" class="btn-primary" type="submit">💾
+                            บันทึกของรางวัลออนไลน์</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="toolbar">
+                <div style="font-weight: 700; font-size: 14px;">📋 รายการแคมเปญรางวัลออนไลน์ในระบบ</div>
+                <button class="btn-refresh" type="button" onclick="loadOnlineRewards()">🔄 รีเฟรชรายการรางวัล</button>
+            </div>
+
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>รูป</th>
+                            <th>ชื่อรางวัล / ประเภท</th>
+                            <th>พอยต์ / โควตา</th>
+                            <th>ผู้ให้รางวัล</th>
+                            <th>ช่วงเวลา</th>
+                            <th>สถานะ</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="online-rewards-tbody">
+                        <tr>
+                            <td colspan="7" class="empty">กำลังโหลดรายการของรางวัล...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ส่วนที่ 3: จัดการคำขอแลกของรางวัล reward_claims -->
+        <section id="section-claims" class="section-panel">
+            <div class="toolbar">
+                <div class="tabs">
+                    <button id="claim-tab-pending" class="tab-btn active" type="button"
+                        onclick="switchClaimTab('pending')">
+                        ⏳ รอดำเนินการ (<span id="count-claim-pending">0</span>)
+                    </button>
+                    <button id="claim-tab-completed" class="tab-btn" type="button"
+                        onclick="switchClaimTab('completed')">
+                        ✅ ส่งรางวัลแล้ว (<span id="count-claim-completed">0</span>)
+                    </button>
+                    <button id="claim-tab-cancelled" class="tab-btn" type="button"
+                        onclick="switchClaimTab('cancelled')">
+                        ❌ ยกเลิกแล้ว (<span id="count-claim-cancelled">0</span>)
+                    </button>
+                </div>
+                <button class="btn-refresh" type="button" onclick="loadRewardClaims()">🔄 รีเฟรชคำขอรางวัล</button>
+            </div>
+
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>รหัสคำขอ</th>
+                            <th>ผู้แลกรางวัล</th>
+                            <th>รางวัลที่แลก</th>
+                            <th>บัญชีปลายทาง</th>
+                            <th>สถานะ / หลักฐาน</th>
+                            <th>วันที่ขอ</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reward-claims-tbody">
+                        <tr>
+                            <td colspan="7" class="empty">กำลังโหลดคำขอแลกของรางวัล...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- โมดอลยืนยันการส่งของรางวัลและแนบหลักฐานปิดรายการ -->
+    <div id="fulfill-modal" class="modal-backdrop" onclick="handleModalBackdropClick(event)">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>📤 ยืนยันการส่งของรางวัลและแนบหลักฐาน</h2>
+                <button class="btn btn-secondary" type="button" onclick="closeFulfillModal()">✕</button>
+            </div>
+
+            <div id="fulfill-claim-summary" class="claim-summary"></div>
+
+            <form id="fulfill-claim-form" onsubmit="handleConfirmFulfillClaim(event)">
+                <input type="hidden" id="fulfill-claim-id" />
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="fulfill-proof-image">อัปโหลดรูปสลิป / หลักฐานการโอน (เก็บใน Bucket:
+                        store-banners)</label>
+                    <input id="fulfill-proof-image" type="file" accept="image/*" />
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="fulfill-proof-text">รหัสคูปอง / เลขอ้างอิงธุรกรรม / ข้อความถึงผู้รับ</label>
+                    <textarea id="fulfill-proof-text" rows="3"
+                        placeholder="เช่น โค้ดรางวัล, เลขอ้างอิงการโอน หรือข้อความยืนยันการส่งรางวัล"></textarea>
+                </div>
+
+                <p style="margin: 0 0 14px; font-size: 12px; color: #b45309;">
+                    * ต้องแนบรูปหลักฐาน หรือกรอกข้อความ/รหัสอ้างอิงอย่างน้อย 1 อย่างก่อนจึงจะปิดรายการได้
+                </p>
+
+                <div class="form-actions">
+                    <button class="btn-secondary" type="button" onclick="closeFulfillModal()">ยกเลิก</button>
+                    <button id="btn-confirm-fulfill" class="btn-primary" type="submit">✅ ยืนยันการจัดส่งรางวัล</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin-merchant.js"></script>
+</body>
+
+</html>
