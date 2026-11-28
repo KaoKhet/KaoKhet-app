@@ -850,6 +850,37 @@ function renderTemplateGlass() {
 // 6. Canvas Export & Camera Shortcut Modal
 // ============================================================================
 
+function drawStudioBackgroundCoverToCanvas(ctx, canvasWidth, canvasHeight, scaleFactor) {
+    ctx.save();
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    if (studioState.hasPhoto && studioBgImageObj && studioBgImageObj.naturalWidth && studioBgImageObj.naturalHeight) {
+        const imgW = studioBgImageObj.naturalWidth;
+        const imgH = studioBgImageObj.naturalHeight;
+
+        // คำนวณสัดส่วน cover ให้เต็มกรอบโดยไม่บีบสัดส่วนภาพ
+        const coverScale = Math.max(canvasWidth / imgW, canvasHeight / imgH);
+        const drawW = imgW * coverScale;
+        const drawH = imgH * coverScale;
+
+        const bgT = studioState.transforms?.bgPhoto || { x: 0, y: 0, scale: 1 };
+        const userScale = bgT.scale || 1;
+        const offsetX = (bgT.x || 0) * scaleFactor;
+        const offsetY = (bgT.y || 0) * scaleFactor;
+
+        ctx.filter = studioState.filterCss && studioState.filterCss !== 'none'
+            ? studioState.filterCss
+            : 'none';
+
+        ctx.translate(canvasWidth / 2 + offsetX, canvasHeight / 2 + offsetY);
+        ctx.scale(userScale, userScale);
+        ctx.drawImage(studioBgImageObj, -drawW / 2, -drawH / 2, drawW, drawH);
+    }
+
+    ctx.restore();
+}
+
 function generateStudioCanvasBlob() {
     return new Promise(async (resolve) => {
         const previewBox = document.getElementById('share-preview-box');
@@ -862,10 +893,15 @@ function generateStudioCanvasBlob() {
         const prevActiveId = activeStickerId;
         const hintEl = document.getElementById('studio-first-visit-hint');
         const prevHintDisplay = hintEl ? hintEl.style.display : '';
+        const bgImgEl = document.getElementById('studio-bg-photo-img');
+        const prevBgImgDisplay = bgImgEl ? bgImgEl.style.display : '';
 
         try {
             if (typeof html2canvas !== 'undefined') {
                 if (hintEl) hintEl.style.display = 'none';
+                if (bgImgEl && studioState.hasPhoto && studioBgImageObj) {
+                    bgImgEl.style.display = 'none';
+                }
 
                 studioState.selectedStickerId = null;
                 activeStickerId = null;
@@ -876,7 +912,7 @@ function generateStudioCanvasBlob() {
                 const boxHeight = Math.max(1, Math.round(rect.height || previewBox.clientHeight || 480));
                 const exportScale = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
 
-                const canvas = await html2canvas(previewBox, {
+                const overlayCanvas = await html2canvas(previewBox, {
                     scale: exportScale,
                     width: boxWidth,
                     height: boxHeight,
@@ -884,15 +920,24 @@ function generateStudioCanvasBlob() {
                     windowHeight: document.documentElement.clientHeight,
                     useCORS: true,
                     allowTaint: true,
-                    backgroundColor: '#0f172a'
+                    backgroundColor: null
                 });
 
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = boxWidth * exportScale;
+                finalCanvas.height = boxHeight * exportScale;
+                const ctx = finalCanvas.getContext('2d');
+
+                drawStudioBackgroundCoverToCanvas(ctx, finalCanvas.width, finalCanvas.height, exportScale);
+                ctx.drawImage(overlayCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
+
                 if (hintEl) hintEl.style.display = prevHintDisplay;
+                if (bgImgEl) bgImgEl.style.display = prevBgImgDisplay;
                 studioState.selectedStickerId = prevSelectedId;
                 activeStickerId = prevActiveId;
                 syncStickersTransformsInDOM();
 
-                canvas.toBlob((blob) => resolve(blob), 'image/png', 0.95);
+                finalCanvas.toBlob((blob) => resolve(blob), 'image/png', 0.95);
                 return;
             }
         } catch (err) {
@@ -900,6 +945,7 @@ function generateStudioCanvasBlob() {
         }
 
         if (hintEl) hintEl.style.display = prevHintDisplay;
+        if (bgImgEl) bgImgEl.style.display = prevBgImgDisplay;
         studioState.selectedStickerId = prevSelectedId;
         activeStickerId = prevActiveId;
         syncStickersTransformsInDOM();
