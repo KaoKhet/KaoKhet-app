@@ -73,6 +73,35 @@ function switchMainSection(sectionName) {
 }
 
 /* =========================================================
+ * Helper อัปเดต role ของผู้ใช้ในตาราง profiles
+ * ========================================================= */
+async function setProfileRole(userId, nextRole) {
+    if (!adminSupabase || !userId) {
+        return { ok: true, skipped: true };
+    }
+
+    const { data: updatedProf, error: profErr } = await adminSupabase
+        .from('profiles')
+        .update({ role: nextRole })
+        .eq('id', userId)
+        .select('id, role');
+
+    if (profErr) {
+        return { ok: false, reason: 'error', message: profErr.message };
+    }
+
+    if (!updatedProf || updatedProf.length === 0) {
+        return {
+            ok: false,
+            reason: 'empty',
+            message: 'ไม่ได้อัปเดต role ใน profiles (0 แถว) ให้ตรวจ RLS ของตาราง profiles หรือ user_id'
+        };
+    }
+
+    return { ok: true, data: updatedProf };
+}
+
+/* =========================================================
  * ส่วนที่ 1: จัดการคำขอผู้ประกอบการ (merchant_requests)
  * ========================================================= */
 function switchAdminTab(tabName) {
@@ -142,8 +171,8 @@ function renderMerchantTable() {
         const actionButtons = currentAdminTab === 'pending'
             ? `
         <button class="btn btn-approve" type="button" onclick="approveMerchantRequest('${safeId}', '${safeUserId}')">อนุมัติ</button>
-        <button class="btn btn-cancel" type="button" onclick="cancelMerchantRequest('${safeId}')">ยกเลิก</button>
-        <button class="btn btn-delete" type="button" onclick="deleteMerchantRequest('${safeId}')">ลบ</button>
+        <button class="btn btn-cancel" type="button" onclick="cancelMerchantRequest('${safeId}', '${safeUserId}')">ยกเลิก</button>
+        <button class="btn btn-delete" type="button" onclick="deleteMerchantRequest('${safeId}', '${safeUserId}')">ลบ</button>
       `
             : `
         <button class="btn btn-delete" type="button" onclick="revokeMerchantPermission('${safeId}', '${safeUserId}')">ถอนสิทธิ์</button>
@@ -185,28 +214,20 @@ async function approveMerchantRequest(requestId, userId) {
         return;
     }
 
-    if (userId) {
-        const { data: updatedProf, error: profErr } = await adminSupabase
-            .from('profiles')
-            .update({ role: 'merchant' })
-            .eq('id', userId)
-            .select();
-
-        if (profErr) {
-            alert('อัปเดตคำขอแล้ว แต่เปลี่ยน role ใน profiles ไม่สำเร็จ: ' + profErr.message);
+    const resolvedUserId = userId || updatedReq[0]?.user_id || '';
+    if (resolvedUserId) {
+        const profResult = await setProfileRole(resolvedUserId, 'merchant');
+        if (!profResult.ok) {
+            alert('อัปเดตคำขอแล้ว แต่เปลี่ยน role ใน profiles ไม่สำเร็จ: ' + profResult.message);
             await loadMerchantRequests();
             return;
-        }
-
-        if (!updatedProf || updatedProf.length === 0) {
-            alert('อัปเดตคำขอแล้ว แต่ไม่ได้อัปเดต role ใน profiles (0 แถว) ให้ตรวจ RLS ของตาราง profiles');
         }
     }
 
     await loadMerchantRequests();
 }
 
-async function cancelMerchantRequest(requestId) {
+async function cancelMerchantRequest(requestId, userId = '') {
     if (!adminSupabase || !requestId) return;
     if (!confirm('ยืนยันยกเลิกคำขอนี้ใช่หรือไม่?')) return;
 
@@ -226,12 +247,23 @@ async function cancelMerchantRequest(requestId) {
         return;
     }
 
+    const resolvedUserId = userId || updatedRows[0]?.user_id || '';
+    if (resolvedUserId) {
+        const profResult = await setProfileRole(resolvedUserId, 'user');
+        if (!profResult.ok) {
+            console.warn('Reset profile role warning on cancel:', profResult.message);
+        }
+    }
+
     await loadMerchantRequests();
 }
 
-async function deleteMerchantRequest(requestId) {
+async function deleteMerchantRequest(requestId, userId = '') {
     if (!adminSupabase || !requestId) return;
     if (!confirm('ยืนยันลบรายการคำขอนี้ออกจากตารางใช่หรือไม่?')) return;
+
+    const targetRow = allMerchantRequests.find((r) => String(r.id) === String(requestId));
+    const resolvedUserId = userId || targetRow?.user_id || '';
 
     const { data: deletedRows, error } = await adminSupabase
         .from('merchant_requests')
@@ -249,12 +281,22 @@ async function deleteMerchantRequest(requestId) {
         return;
     }
 
+    if (resolvedUserId) {
+        const profResult = await setProfileRole(resolvedUserId, 'user');
+        if (!profResult.ok) {
+            alert('ลบคำขอแล้ว แต่คืนค่า role ใน profiles ไม่สำเร็จ: ' + profResult.message);
+        }
+    }
+
     await loadMerchantRequests();
 }
 
 async function revokeMerchantPermission(requestId, userId) {
     if (!adminSupabase || !requestId) return;
     if (!confirm('ยืนยันถอนสิทธิ์ผู้ประกอบการและลบรายการคำขอนี้ออกใช่หรือไม่?')) return;
+
+    const targetRow = allMerchantRequests.find((r) => String(r.id) === String(requestId));
+    const resolvedUserId = userId || targetRow?.user_id || '';
 
     const { data: deletedRows, error: delErr } = await adminSupabase
         .from('merchant_requests')
@@ -272,21 +314,12 @@ async function revokeMerchantPermission(requestId, userId) {
         return;
     }
 
-    if (userId) {
-        const { data: updatedProf, error: profErr } = await adminSupabase
-            .from('profiles')
-            .update({ role: 'user' })
-            .eq('id', userId)
-            .select();
-
-        if (profErr) {
-            alert('ลบคำขอแล้ว แต่คืนค่า role ใน profiles ไม่สำเร็จ: ' + profErr.message);
+    if (resolvedUserId) {
+        const profResult = await setProfileRole(resolvedUserId, 'user');
+        if (!profResult.ok) {
+            alert('ลบคำขอแล้ว แต่คืนค่า role ใน profiles ไม่สำเร็จ: ' + profResult.message);
             await loadMerchantRequests();
             return;
-        }
-
-        if (!updatedProf || updatedProf.length === 0) {
-            alert('ลบคำขอแล้ว แต่ไม่ได้อัปเดต role ใน profiles (0 แถว) ให้ตรวจ RLS ของตาราง profiles');
         }
     }
 
@@ -727,7 +760,6 @@ async function handleConfirmFulfillClaim(event) {
             throw new Error('ไม่ได้อัปเดต reward_claims (0 แถว) กรุณาตรวจสอบสิทธิ์หรือ RLS Policy');
         }
 
-        // ส่งแจ้งเตือนเข้าตาราง notifications ให้ผู้เล่น (ใช้คอลัมน์จริง: user_id, title, message, is_read)
         if (claim.user_id) {
             const detailNote = proofText ? ` | รายละเอียด/รหัส: ${proofText}` : '';
             const slipLink = proofImageUrl ? ` | ดูหลักฐานการโอน: ${proofImageUrl}` : '';

@@ -211,8 +211,17 @@ function applyAllStudioTransforms() {
     const bgLayer = document.getElementById('studio-bg-photo-layer');
     if (bgLayer) {
         const bgT = studioState.transforms.bgPhoto || { x: 0, y: 0, scale: 1 };
+        bgLayer.style.transformOrigin = 'center center';
         bgLayer.style.transform = `translate(${bgT.x}px, ${bgT.y}px) scale(${bgT.scale})`;
         bgLayer.style.filter = studioState.filterCss || 'none';
+    }
+
+    const bgImg = document.getElementById('studio-bg-photo-img');
+    if (bgImg && studioState.hasPhoto) {
+        bgImg.style.width = '100%';
+        bgImg.style.height = '100%';
+        bgImg.style.objectFit = 'cover';
+        bgImg.style.display = 'block';
     }
 
     const stage = document.getElementById('studio-template-stage');
@@ -597,6 +606,9 @@ function handleStudioPhotoUpload(event) {
             const emptyHint = document.getElementById('studio-empty-photo-hint');
             if (imgEl) {
                 imgEl.src = e.target.result;
+                imgEl.style.width = '100%';
+                imgEl.style.height = '100%';
+                imgEl.style.objectFit = 'cover';
                 imgEl.style.display = 'block';
             }
             if (emptyHint) emptyHint.style.display = 'none';
@@ -848,19 +860,28 @@ function generateStudioCanvasBlob() {
 
         const prevSelectedId = studioState.selectedStickerId;
         const prevActiveId = activeStickerId;
+        const hintEl = document.getElementById('studio-first-visit-hint');
+        const prevHintDisplay = hintEl ? hintEl.style.display : '';
 
         try {
             if (typeof html2canvas !== 'undefined') {
-                const hintEl = document.getElementById('studio-first-visit-hint');
-                const prevHintDisplay = hintEl ? hintEl.style.display : '';
                 if (hintEl) hintEl.style.display = 'none';
 
                 studioState.selectedStickerId = null;
                 activeStickerId = null;
                 syncStickersTransformsInDOM();
 
+                const rect = previewBox.getBoundingClientRect();
+                const boxWidth = Math.max(1, Math.round(rect.width || previewBox.clientWidth || 360));
+                const boxHeight = Math.max(1, Math.round(rect.height || previewBox.clientHeight || 480));
+                const exportScale = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
+
                 const canvas = await html2canvas(previewBox, {
-                    scale: 3,
+                    scale: exportScale,
+                    width: boxWidth,
+                    height: boxHeight,
+                    windowWidth: document.documentElement.clientWidth,
+                    windowHeight: document.documentElement.clientHeight,
                     useCORS: true,
                     allowTaint: true,
                     backgroundColor: '#0f172a'
@@ -878,6 +899,7 @@ function generateStudioCanvasBlob() {
             console.error('html2canvas error:', err);
         }
 
+        if (hintEl) hintEl.style.display = prevHintDisplay;
         studioState.selectedStickerId = prevSelectedId;
         activeStickerId = prevActiveId;
         syncStickersTransformsInDOM();
